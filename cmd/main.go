@@ -9,8 +9,10 @@ import (
 	"os"
 	"os/signal"
 	"service-courier/internal/handler"
-	"service-courier/internal/repository"
-	"service-courier/internal/service"
+	handlerCourier "service-courier/internal/handler/courier"
+	repoCourier "service-courier/internal/repository/courier"
+	serviceCourier "service-courier/internal/service/courier"
+
 	"syscall"
 
 	"time"
@@ -28,22 +30,37 @@ func main() {
 	}
 
 	dbPool := initDBPool()
-	courierRepository := repository.NewCourierRepository(dbPool)
-	courierService := service.NewCourierService(courierRepository)
-	courier := handler.NewCourierHandler(courierService)
+	courierRepository := repoCourier.NewCourierRepository(dbPool)
+	courierService := serviceCourier.NewCourierService(courierRepository)
+	courier := handlerCourier.NewCourierHandler(courierService)
 
 	srv := &http.Server{
 		Addr:    ":" + resolvePort(),
 		Handler: initRouter(courier),
 	}
 
-	go gracefulShutdown(srv, dbPool)
+	go func() {
+		log.Printf("Server started on %s\n", srv.Addr)
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server start error: %v\n", err)
+		}
+	}()
 
-	log.Printf("Server started on %s\n", srv.Addr)
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("Server start error: %v\n", err)
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	<-sigCtx.Done()
+	log.Println("Server is shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Server shutdown failed: %v\n", err)
 	}
 
+	dbPool.Close()
+	log.Println("Shutting down service-courier")
 }
 
 func resolvePort() string {
@@ -63,24 +80,7 @@ func resolvePort() string {
 	return port
 }
 
-func gracefulShutdown(srv *http.Server, dbPool *pgxpool.Pool) {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	<-ctx.Done()
-	log.Println("Server is shutting down...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown failed: %v\n", err)
-	}
-	log.Println("Shutting down service-courier")
-
-}
-
-func initRouter(courier *handler.CourierHandler) *chi.Mux {
+func initRouter(courier *handlerCourier.CourierHandler) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Get("/ping", handler.Ping)
@@ -123,7 +123,7 @@ func initDBPool() *pgxpool.Pool {
 		log.Fatalf("Unable to create connection pool: %v\n", err)
 	}
 
-	err = dbPool.Ping(ctx)
+	err = pingDatabaseWithRetry(ctx, dbPool, 5, 2*time.Second)
 	if err != nil {
 		log.Fatalf("Unable to ping database: %v\n", err)
 	}
@@ -140,4 +140,20 @@ func getConnectionString() string {
 	dbname := os.Getenv("POSTGRES_DB")
 
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, password, host, port, dbname)
+}
+
+func pingDatabaseWithRetry(ctx context.Context, dbPool *pgxpool.Pool, maxRetries int, retryDelay time.Duration) error {
+	for i := range maxRetries {
+		err := dbPool.Ping(ctx)
+		if err == nil {
+			return nil
+		}
+
+		if i < maxRetries-1 {
+			log.Printf("Unable to ping database\n")
+			time.Sleep(retryDelay)
+		}
+	}
+	return fmt.Errorf("failed to ping database after %d attempts", maxRetries)
+
 }

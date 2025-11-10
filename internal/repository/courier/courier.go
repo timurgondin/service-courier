@@ -1,13 +1,15 @@
-package repository
+package courier
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"service-courier/internal/model"
-	"strings"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,7 +37,7 @@ func (r *CourierRepository) GetByID(ctx context.Context, id int64) (*model.Couri
 		&courier.Status,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, model.ErrCourierNotFound
 		}
 		return nil, fmt.Errorf("database error: %w", err)
@@ -100,8 +102,11 @@ func (r *CourierRepository) Create(ctx context.Context, courier *model.CourierDB
 	err = r.pool.QueryRow(ctx, query, args...).Scan(&id)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key value") {
-			return 0, model.ErrPhoneExists
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == pgerrcode.UniqueViolation {
+				return 0, model.ErrPhoneExists
+			}
 		}
 		return 0, fmt.Errorf("database error: %w", err)
 	}
@@ -135,8 +140,11 @@ func (r *CourierRepository) Update(ctx context.Context, courier *model.CourierUp
 	cmdTag, err := r.pool.Exec(ctx, query, args...)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key value") {
-			return model.ErrPhoneExists
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == pgerrcode.UniqueViolation {
+				return model.ErrPhoneExists
+			}
 		}
 		return fmt.Errorf("database error: %w", err)
 	}

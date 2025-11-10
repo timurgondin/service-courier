@@ -1,4 +1,4 @@
-package service
+package courier
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 )
 
 type CourierService struct {
-	repository CourierRepository
+	repository courierRepository
 }
 
-func NewCourierService(repository CourierRepository) *CourierService {
+func NewCourierService(repository courierRepository) *CourierService {
 	return &CourierService{repository: repository}
 }
 
@@ -61,16 +61,16 @@ func (c *CourierService) GetAllCouriers(ctx context.Context) ([]model.Courier, e
 	return couriers, nil
 }
 
-func (c *CourierService) CreateCourier(ctx context.Context, req *model.CourierCreateRequest) (int64, error) {
+func (c *CourierService) CreateCourier(ctx context.Context, req *model.CourierCreateRequest) (id int64, err error) {
 
-	if err := validateName(req.Name); err != nil {
-		return 0, err
+	if err = validateName(req.Name); err != nil {
+		return
 	}
-	if err := validatePhone(req.Phone); err != nil {
-		return 0, err
+	if err = validatePhone(req.Phone); err != nil {
+		return
 	}
-	if err := validateStatus(req.Status); err != nil {
-		return 0, err
+	if err = validateStatus(req.Status); err != nil {
+		return
 	}
 
 	courierDB := &model.CourierDB{
@@ -79,16 +79,13 @@ func (c *CourierService) CreateCourier(ctx context.Context, req *model.CourierCr
 		Status: req.Status,
 	}
 
-	id, err := c.repository.Create(ctx, courierDB)
+	id, err = c.repository.Create(ctx, courierDB)
 
 	if err != nil {
-		if errors.Is(err, model.ErrPhoneExists) {
-			return 0, model.ErrPhoneExists
-		}
-		return 0, err
+		return
 	}
 
-	return id, nil
+	return
 }
 
 func (u *CourierService) UpdateCourier(ctx context.Context, req *model.CourierUpdateRequest) error {
@@ -120,10 +117,10 @@ func (u *CourierService) UpdateCourier(ctx context.Context, req *model.CourierUp
 	err := u.repository.Update(ctx, courierUpdateDB)
 
 	if err != nil {
-		switch err {
-		case model.ErrCourierNotFound:
+		switch {
+		case errors.Is(err, model.ErrCourierNotFound):
 			return model.ErrCourierNotFound
-		case model.ErrPhoneExists:
+		case errors.Is(err, model.ErrPhoneExists):
 			return model.ErrPhoneExists
 		}
 		return err

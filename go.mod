@@ -7,6 +7,7 @@ require github.com/joho/godotenv v1.5.1
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/go-chi/chi/v5 v5.2.3
+	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/spf13/pflag v1.0.10
 )
