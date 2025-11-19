@@ -4,70 +4,86 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"service-courier/internal/model"
+	"service-courier/internal/model/courier"
 
-	sq "github.com/Masterminds/squirrel"
+	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type CourierRepository struct {
-	pool *pgxpool.Pool
+type Repository struct {
+	pool         *pgxpool.Pool
+	queryBuilder squirrel.StatementBuilderType
 }
 
-func NewCourierRepository(pool *pgxpool.Pool) *CourierRepository {
-	return &CourierRepository{pool: pool}
+func NewCourierRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
+		pool:         pool,
+		queryBuilder: squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar),
+	}
 }
 
-func (r *CourierRepository) GetByID(ctx context.Context, id int64) (*model.CourierDB, error) {
-	query, args, err := sq.
-		Select("id", "name", "phone", "status").
+func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, error) {
+	query := r.queryBuilder.
+		Select("id", "name", "phone", "status", "created_at", "updated_at").
 		From("couriers").
-		Where(sq.Eq{"id": id}).
-		PlaceholderFormat(sq.Dollar).
-		ToSql()
+		Where(squirrel.Eq{"id": id})
 
-	var courier model.CourierDB
-	err = r.pool.QueryRow(ctx, query, args...).Scan(
-		&courier.ID,
-		&courier.Name,
-		&courier.Phone,
-		&courier.Status,
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build query: %w", err)
+	}
+
+	var courierData courier.Courier
+	err = r.pool.QueryRow(ctx, sql, args...).Scan(
+		&courierData.ID,
+		&courierData.Name,
+		&courierData.Phone,
+		&courierData.Status,
+		&courierData.CreatedAt,
+		&courierData.UpdatedAt,
 	)
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, model.ErrCourierNotFound
+			return nil, courier.ErrCourierNotFound
 		}
 		return nil, fmt.Errorf("database error: %w", err)
 	}
 
-	return &courier, nil
+	return &courierData, nil
 }
 
-func (r *CourierRepository) GetAll(ctx context.Context) ([]model.CourierDB, error) {
-	query, args, err := sq.
-		Select("id", "name", "phone", "status").
+func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
+	query, args, err := r.queryBuilder.
+		Select("id", "name", "phone", "status", "created_at", "updated_at").
 		From("couriers").
-		OrderBy("id ASC").
-		PlaceholderFormat(sq.Dollar).
+		OrderBy("id").
 		ToSql()
 
+	if err != nil {
+		return nil, fmt.Errorf("build query: %w", err)
+	}
+
 	rows, err := r.pool.Query(ctx, query, args...)
+
 	if err != nil {
 		return nil, fmt.Errorf("database error: %w", err)
 	}
 	defer rows.Close()
 
-	var couriers []model.CourierDB
+	couriers := make([]courier.Courier, 0)
 	for rows.Next() {
-		var courier model.CourierDB
+		var courier courier.Courier
 		err := rows.Scan(
 			&courier.ID,
 			&courier.Name,
 			&courier.Phone,
 			&courier.Status,
+			&courier.CreatedAt,
+			&courier.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error reading data: %w", err)
@@ -79,78 +95,68 @@ func (r *CourierRepository) GetAll(ctx context.Context) ([]model.CourierDB, erro
 		return nil, fmt.Errorf("database error: %w", err)
 	}
 
-	if couriers == nil {
-		couriers = []model.CourierDB{}
-	}
-
 	return couriers, nil
 }
 
-func (r *CourierRepository) Create(ctx context.Context, courier *model.CourierDB) (int64, error) {
-	var id int64
-	query, args, err := sq.
-		Insert("couriers").Columns("name", "phone", "status").
-		Values(courier.Name, courier.Phone, courier.Status).
+func (r *Repository) Create(ctx context.Context, courierData courier.Courier) (id int64, err error) {
+	query, args, err := r.queryBuilder.
+		Insert("couriers").
+		Columns("name", "phone", "status").
+		Values(courierData.Name, courierData.Phone, courierData.Status).
 		Suffix("RETURNING id").
-		PlaceholderFormat(sq.Dollar).
 		ToSql()
 
 	if err != nil {
-		return 0, fmt.Errorf("build query: %w", err)
+		return id, fmt.Errorf("build query: %w", err)
 	}
 
 	err = r.pool.QueryRow(ctx, query, args...).Scan(&id)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == pgerrcode.UniqueViolation {
-				return 0, model.ErrPhoneExists
-			}
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return 0, courier.ErrPhoneExists
 		}
 		return 0, fmt.Errorf("database error: %w", err)
 	}
 	return id, nil
 }
 
-func (r *CourierRepository) Update(ctx context.Context, courier *model.CourierUpdateDB) error {
+func (r *Repository) Update(ctx context.Context, courierData courier.Courier) error {
 
-	updateBuilder := sq.Update("couriers")
+	updateBuilder := r.queryBuilder.
+		Update("couriers").
+		Set("updated_at", squirrel.Expr("NOW()")).
+		Where(squirrel.Eq{"id": courierData.ID})
 
-	if courier.Name != nil {
-		updateBuilder = updateBuilder.Set("name", *courier.Name)
+	if courierData.Name != "" {
+		updateBuilder = updateBuilder.Set("name", courierData.Name)
 	}
-	if courier.Phone != nil {
-		updateBuilder = updateBuilder.Set("phone", *courier.Phone)
+	if courierData.Phone != "" {
+		updateBuilder = updateBuilder.Set("phone", courierData.Phone)
 	}
-	if courier.Status != nil {
-		updateBuilder = updateBuilder.Set("status", *courier.Status)
+	if courierData.Status != "" {
+		updateBuilder = updateBuilder.Set("status", courierData.Status)
 	}
 
-	query, args, err := updateBuilder.
-		Set("updated_at", courier.UpdatedAt).
-		Where((sq.Eq{"id": courier.ID})).
-		PlaceholderFormat(sq.Dollar).
-		ToSql()
+	query, args, err := updateBuilder.ToSql()
 
 	if err != nil {
 		return fmt.Errorf("build query: %w", err)
 	}
 
-	cmdTag, err := r.pool.Exec(ctx, query, args...)
+	result, err := r.pool.Exec(ctx, query, args...)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == pgerrcode.UniqueViolation {
-				return model.ErrPhoneExists
-			}
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return courier.ErrPhoneExists
 		}
 		return fmt.Errorf("database error: %w", err)
 	}
 
-	if cmdTag.RowsAffected() == 0 {
-		return model.ErrCourierNotFound
+	if result.RowsAffected() == 0 {
+		return courier.ErrCourierNotFound
 	}
 
 	return nil

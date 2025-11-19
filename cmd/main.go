@@ -8,16 +8,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"service-courier/internal/handler"
-	handlerCourier "service-courier/internal/handler/courier"
-	repoCourier "service-courier/internal/repository/courier"
-	serviceCourier "service-courier/internal/service/courier"
-
 	"syscall"
-
 	"time"
 
+	"service-courier/internal/handler/common"
+	courierHandler "service-courier/internal/handler/courier"
+	courierRepo "service-courier/internal/repository/courier"
+	courierService "service-courier/internal/service/courier"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	flag "github.com/spf13/pflag"
@@ -29,37 +29,27 @@ func main() {
 		log.Fatalf("Error loading .env file: %s", err.Error())
 	}
 
-	dbPool := initDBPool()
-	courierRepository := repoCourier.NewCourierRepository(dbPool)
-	courierService := serviceCourier.NewCourierService(courierRepository)
-	courier := handlerCourier.NewCourierHandler(courierService)
+	dbPool := mustInitDB()
+	courierRepository := courierRepo.NewCourierRepository(dbPool)
+	courierService := courierService.NewCourierService(courierRepository)
+	courier := courierHandler.NewCourierHandler(courierService)
 
 	srv := &http.Server{
 		Addr:    ":" + resolvePort(),
 		Handler: initRouter(courier),
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
+		defer close(serverErr)
 		log.Printf("Server started on %s\n", srv.Addr)
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Server start error: %v\n", err)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
 		}
 	}()
 
-	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	waitGracefulShutdown(srv, dbPool, serverErr)
 
-	<-sigCtx.Done()
-	log.Println("Server is shutting down...")
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Server shutdown failed: %v\n", err)
-	}
-
-	dbPool.Close()
 	log.Println("Shutting down service-courier")
 }
 
@@ -74,17 +64,43 @@ func resolvePort() string {
 	}
 
 	if port == "" {
-		log.Fatalf("Config error")
+		log.Fatalf("Server port is not specified")
 	}
 
 	return port
 }
 
-func initRouter(courier *handlerCourier.CourierHandler) *chi.Mux {
-	r := chi.NewRouter()
+func waitGracefulShutdown(srv *http.Server, dbPool *pgxpool.Pool, serverErr <-chan error) {
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	r.Get("/ping", handler.Ping)
-	r.Head("/healthcheck", handler.HealthCheck)
+	select {
+	case err := <-serverErr:
+		log.Printf("Server error occurred: %v\n", err)
+	case <-sigCtx.Done():
+		log.Println("Shutdown initiated by signal")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Server shutdown failed: %v\n", err)
+	} else {
+		log.Println("HTTP server stoped")
+	}
+
+	log.Println("Closing DB pool...")
+	dbPool.Close()
+	log.Println("DB pool closed")
+}
+
+func initRouter(courier *courierHandler.Handler) *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+
+	r.Get("/ping", common.Ping)
+	r.Head("/healthcheck", common.HealthCheck)
 
 	r.Get("/couriers", courier.GetAll)
 
@@ -97,15 +113,10 @@ func initRouter(courier *handlerCourier.CourierHandler) *chi.Mux {
 	return r
 }
 
-func initDBPool() *pgxpool.Pool {
+func mustInitDB() *pgxpool.Pool {
 	var dbPool *pgxpool.Pool
 
-	connString := getConnectionString()
-	if connString == "" {
-		log.Fatal("DATABASE_URL environment variable is required")
-	}
-
-	config, err := pgxpool.ParseConfig(connString)
+	config, err := pgxpool.ParseConfig(getConnectionString())
 	if err != nil {
 		log.Fatalf("Unable to parse connection string: %v\n", err)
 	}
@@ -123,8 +134,9 @@ func initDBPool() *pgxpool.Pool {
 		log.Fatalf("Unable to create connection pool: %v\n", err)
 	}
 
-	err = pingDatabaseWithRetry(ctx, dbPool, 5, 2*time.Second)
+	err = pingDatabaseWithRetry(ctx, dbPool, 2, 2*time.Second)
 	if err != nil {
+		dbPool.Close()
 		log.Fatalf("Unable to ping database: %v\n", err)
 	}
 
@@ -149,11 +161,10 @@ func pingDatabaseWithRetry(ctx context.Context, dbPool *pgxpool.Pool, maxRetries
 			return nil
 		}
 
-		if i < maxRetries-1 {
-			log.Printf("Unable to ping database\n")
+		if i < maxRetries {
+			log.Printf("db ping attempt %d failed: %v", i+1, err)
 			time.Sleep(retryDelay)
 		}
 	}
 	return fmt.Errorf("failed to ping database after %d attempts", maxRetries)
-
 }

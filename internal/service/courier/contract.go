@@ -2,12 +2,12 @@ package courier
 
 import (
 	"context"
-	"service-courier/internal/model"
+	"service-courier/internal/model/courier"
 )
 
 type courierRepository interface {
-	GetByID(ctx context.Context, id int64) (*model.CourierDB, error)
-	GetAll(ctx context.Context) ([]model.CourierDB, error)
-	Create(ctx context.Context, courier *model.CourierDB) (int64, error)
-	Update(ctx context.Context, courier *model.CourierUpdateDB) error
+	GetByID(ctx context.Context, id int64) (*courier.Courier, error)
+	GetAll(ctx context.Context) ([]courier.Courier, error)
+	Create(ctx context.Context, courierData courier.Courier) (int64, error)
+	Update(ctx context.Context, courierData courier.Courier) error
 }
