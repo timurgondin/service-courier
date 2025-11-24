@@ -13,9 +13,14 @@ import (
 
 	"service-courier/internal/handler/common"
 	courierHandler "service-courier/internal/handler/courier"
+	deliveryHandler "service-courier/internal/handler/delivery"
 	courierRepo "service-courier/internal/repository/courier"
+	deliveryRepo "service-courier/internal/repository/delivery"
 	courierService "service-courier/internal/service/courier"
+	deliveryService "service-courier/internal/service/delivery"
 
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,13 +35,28 @@ func main() {
 	}
 
 	dbPool := mustInitDB()
+
 	courierRepository := courierRepo.NewCourierRepository(dbPool)
 	courierService := courierService.NewCourierService(courierRepository)
 	courier := courierHandler.NewCourierHandler(courierService)
 
+	ctxGetter := trmpgx.DefaultCtxGetter
+	deliveryRepository := deliveryRepo.NewDeliveryRepository(dbPool, ctxGetter)
+	deliveryTimeFactory := deliveryService.NewDeliveryTimeFactory()
+
+	txManager := manager.Must(trmpgx.NewDefaultFactory(dbPool))
+
+	deliveryService := deliveryService.NewDeliveryService(
+		deliveryRepository,
+		courierRepository,
+		deliveryTimeFactory,
+		txManager,
+	)
+	delivery := deliveryHandler.NewDeliveryHandler(deliveryService)
+
 	srv := &http.Server{
 		Addr:    ":" + resolvePort(),
-		Handler: initRouter(courier),
+		Handler: initRouter(courier, delivery),
 	}
 
 	serverErr := make(chan error, 1)
@@ -95,7 +115,7 @@ func waitGracefulShutdown(srv *http.Server, dbPool *pgxpool.Pool, serverErr <-ch
 	log.Println("DB pool closed")
 }
 
-func initRouter(courier *courierHandler.Handler) *chi.Mux {
+func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
@@ -108,6 +128,11 @@ func initRouter(courier *courierHandler.Handler) *chi.Mux {
 		r.Get("/{id}", courier.Get)
 		r.Post("/", courier.Create)
 		r.Put("/", courier.Update)
+	})
+
+	r.Route("/delivery", func(r chi.Router) {
+		r.Post("/assign", delivery.Assign)
+		r.Post("/unassign", delivery.Unassign)
 	})
 
 	return r

@@ -27,7 +27,7 @@ func NewCourierRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, error) {
 	query := r.queryBuilder.
-		Select("id", "name", "phone", "status", "created_at", "updated_at").
+		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
 		From("couriers").
 		Where(squirrel.Eq{"id": id})
 
@@ -42,6 +42,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, e
 		&courierData.Name,
 		&courierData.Phone,
 		&courierData.Status,
+		&courierData.TransportType,
 		&courierData.CreatedAt,
 		&courierData.UpdatedAt,
 	)
@@ -58,7 +59,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, e
 
 func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 	query, args, err := r.queryBuilder.
-		Select("id", "name", "phone", "status", "created_at", "updated_at").
+		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
 		From("couriers").
 		OrderBy("id").
 		ToSql()
@@ -76,19 +77,20 @@ func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 
 	couriers := make([]courier.Courier, 0)
 	for rows.Next() {
-		var courier courier.Courier
+		var courierData courier.Courier
 		err := rows.Scan(
-			&courier.ID,
-			&courier.Name,
-			&courier.Phone,
-			&courier.Status,
-			&courier.CreatedAt,
-			&courier.UpdatedAt,
+			&courierData.ID,
+			&courierData.Name,
+			&courierData.Phone,
+			&courierData.Status,
+			&courierData.TransportType,
+			&courierData.CreatedAt,
+			&courierData.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error reading data: %w", err)
 		}
-		couriers = append(couriers, courier)
+		couriers = append(couriers, courierData)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -101,8 +103,8 @@ func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 func (r *Repository) Create(ctx context.Context, courierData courier.Courier) (id int64, err error) {
 	query, args, err := r.queryBuilder.
 		Insert("couriers").
-		Columns("name", "phone", "status").
-		Values(courierData.Name, courierData.Phone, courierData.Status).
+		Columns("name", "phone", "status", "transport_type").
+		Values(courierData.Name, courierData.Phone, courierData.Status, courierData.TransportType).
 		Suffix("RETURNING id").
 		ToSql()
 
@@ -138,6 +140,9 @@ func (r *Repository) Update(ctx context.Context, courierData courier.Courier) er
 	if courierData.Status != "" {
 		updateBuilder = updateBuilder.Set("status", courierData.Status)
 	}
+	if courierData.TransportType != "" {
+		updateBuilder = updateBuilder.Set("transport_type", courierData.TransportType)
+	}
 
 	query, args, err := updateBuilder.ToSql()
 
@@ -160,4 +165,37 @@ func (r *Repository) Update(ctx context.Context, courierData courier.Courier) er
 	}
 
 	return nil
+}
+
+func (r *Repository) GetAvailable(ctx context.Context) (*courier.Courier, error) {
+	query := r.queryBuilder.
+		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
+		From("couriers").
+		Where(squirrel.Eq{"status": "available"}).
+		Limit(1)
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build query: %w", err)
+	}
+
+	var courierData courier.Courier
+	err = r.pool.QueryRow(ctx, sql, args...).Scan(
+		&courierData.ID,
+		&courierData.Name,
+		&courierData.Phone,
+		&courierData.Status,
+		&courierData.TransportType,
+		&courierData.CreatedAt,
+		&courierData.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("no available courier found")
+		}
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+
+	return &courierData, nil
 }
