@@ -10,5 +10,4 @@ type courierRepository interface {
 	GetAll(ctx context.Context) ([]courier.Courier, error)
 	Create(ctx context.Context, courierData courier.Courier) (int64, error)
 	Update(ctx context.Context, courierData courier.Courier) error
-	GetAvailable(ctx context.Context) (*courier.Courier, error)
 }

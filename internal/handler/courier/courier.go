@@ -28,13 +28,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	courier, err := h.service.GetCourier(r.Context(), id)
+	courierData, err := h.service.GetCourier(r.Context(), id)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, ModelToResponse(*courier))
+	h.writeJSON(w, http.StatusOK, ModelToResponse(*courierData))
 }
 
 func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {

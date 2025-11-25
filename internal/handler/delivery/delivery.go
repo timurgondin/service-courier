@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"service-courier/internal/model/courier"
 	"service-courier/internal/model/delivery"
 )
 
@@ -82,7 +83,7 @@ func (h *Handler) mapError(err error) (string, int) {
 		return "Delivery not found", http.StatusNotFound
 	case errors.Is(err, delivery.ErrOrderAlreadyAssigned):
 		return "Order already assigned", http.StatusConflict
-	case errors.Is(err, delivery.ErrNoAvailableCouriers):
+	case errors.Is(err, courier.ErrNoAvailableCouriers):
 		return "No available couriers", http.StatusConflict
 	default:
 		return "Internal server error", http.StatusInternalServerError

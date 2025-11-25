@@ -27,7 +27,7 @@ func NewCourierRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, error) {
 	query := r.queryBuilder.
-		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
+		Select("id", "name", "phone", "status", "transport_type", "total_deliveries", "created_at", "updated_at").
 		From("couriers").
 		Where(squirrel.Eq{"id": id})
 
@@ -43,6 +43,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, e
 		&courierData.Phone,
 		&courierData.Status,
 		&courierData.TransportType,
+		&courierData.TotalDeliveries,
 		&courierData.CreatedAt,
 		&courierData.UpdatedAt,
 	)
@@ -59,7 +60,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, e
 
 func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 	query, args, err := r.queryBuilder.
-		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
+		Select("id", "name", "phone", "status", "transport_type", "total_deliveries", "created_at", "updated_at").
 		From("couriers").
 		OrderBy("id").
 		ToSql()
@@ -84,6 +85,7 @@ func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 			&courierData.Phone,
 			&courierData.Status,
 			&courierData.TransportType,
+			&courierData.TotalDeliveries,
 			&courierData.CreatedAt,
 			&courierData.UpdatedAt,
 		)
@@ -125,7 +127,6 @@ func (r *Repository) Create(ctx context.Context, courierData courier.Courier) (i
 }
 
 func (r *Repository) Update(ctx context.Context, courierData courier.Courier) error {
-
 	updateBuilder := r.queryBuilder.
 		Update("couriers").
 		Set("updated_at", squirrel.Expr("NOW()")).
@@ -167,35 +168,85 @@ func (r *Repository) Update(ctx context.Context, courierData courier.Courier) er
 	return nil
 }
 
-func (r *Repository) GetAvailable(ctx context.Context) (*courier.Courier, error) {
-	query := r.queryBuilder.
-		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
+func (r *Repository) GetAvailableWithMinDeliveries(ctx context.Context) (*courier.Courier, error) {
+	query, args, err := r.queryBuilder.
+		Select("id", "name", "phone", "status", "transport_type", "total_deliveries", "created_at", "updated_at").
 		From("couriers").
 		Where(squirrel.Eq{"status": "available"}).
-		Limit(1)
+		OrderBy("total_deliveries ASC", "id ASC").
+		Limit(1).
+		ToSql()
 
-	sql, args, err := query.ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("build query: %w", err)
 	}
 
 	var courierData courier.Courier
-	err = r.pool.QueryRow(ctx, sql, args...).Scan(
+	err = r.pool.QueryRow(ctx, query, args...).Scan(
 		&courierData.ID,
 		&courierData.Name,
 		&courierData.Phone,
 		&courierData.Status,
 		&courierData.TransportType,
+		&courierData.TotalDeliveries,
 		&courierData.CreatedAt,
 		&courierData.UpdatedAt,
 	)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("no available courier found")
+			return nil, courier.ErrNoAvailableCouriers
 		}
 		return nil, fmt.Errorf("database error: %w", err)
 	}
 
 	return &courierData, nil
+}
+
+func (r *Repository) IncrementDeliveriesBatch(ctx context.Context, courierIDs []int64) error {
+	if len(courierIDs) == 0 {
+		return nil
+	}
+
+	query, args, err := r.queryBuilder.
+		Update("couriers").
+		Set("total_deliveries", squirrel.Expr("total_deliveries + 1")).
+		Set("updated_at", squirrel.Expr("NOW()")).
+		Where(squirrel.Eq{"id": courierIDs}).
+		ToSql()
+
+	if err != nil {
+		return fmt.Errorf("build query: %w", err)
+	}
+
+	_, err = r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to increment deliveries: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) UpdateStatusBatch(ctx context.Context, ids []int64, status courier.CourierStatus) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	query, args, err := r.queryBuilder.
+		Update("couriers").
+		Set("status", status).
+		Set("updated_at", squirrel.Expr("NOW()")).
+		Where(squirrel.Eq{"id": ids}).
+		ToSql()
+
+	if err != nil {
+		return fmt.Errorf("build query: %w", err)
+	}
+
+	_, err = r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("update status batch: %w", err)
+	}
+
+	return nil
 }

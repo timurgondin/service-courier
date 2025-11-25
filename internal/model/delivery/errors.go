@@ -5,5 +5,4 @@ import "errors"
 var (
 	ErrDeliveryNotFound     = errors.New("delivery not found")
 	ErrOrderAlreadyAssigned = errors.New("order already assigned")
-	ErrNoAvailableCouriers  = errors.New("no available couriers")
 )

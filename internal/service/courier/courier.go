@@ -21,10 +21,10 @@ func (s *Service) GetAllCouriers(ctx context.Context) ([]courier.Courier, error)
 	return s.repo.GetAll(ctx)
 }
 
-func (s *Service) CreateCourier(ctx context.Context, courier courier.Courier) (id int64, err error) {
-	return s.repo.Create(ctx, courier)
+func (s *Service) CreateCourier(ctx context.Context, courierData courier.Courier) (id int64, err error) {
+	return s.repo.Create(ctx, courierData)
 }
 
-func (s *Service) UpdateCourier(ctx context.Context, courier courier.Courier) error {
-	return s.repo.Update(ctx, courier)
+func (s *Service) UpdateCourier(ctx context.Context, courierData courier.Courier) error {
+	return s.repo.Update(ctx, courierData)
 }
