@@ -18,8 +18,6 @@ import (
 	dtoDelivery "service-courier/internal/service/delivery"
 )
 
-/************ TEST: POST /delivery/assign ************/
-
 func TestAssignCourier_Success(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
@@ -150,8 +148,6 @@ func TestAssignCourier_NoAvailableCouriers(t *testing.T) {
 		t.Fatalf("expected 409 Conflict, got %d", rr.Code)
 	}
 }
-
-/************ TEST: POST /delivery/unassign ************/
 
 func TestUnassignCourier_Success(t *testing.T) {
 	t.Parallel()
