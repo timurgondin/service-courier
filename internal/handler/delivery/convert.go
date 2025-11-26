@@ -7,10 +7,10 @@ import (
 
 func ResultToAssignResponse(res delivery.AssignResult) AssignResponse {
 	return AssignResponse{
-		CourierID:        res.CourierID,
-		OrderID:          res.OrderID,
-		TransportType:    string(res.TransportType),
-		DeliveryDeadline: res.DeliveryDeadline.Format(time.RFC3339),
+		CourierID:     res.CourierID,
+		OrderID:       res.OrderID,
+		TransportType: string(res.TransportType),
+		Deadline:      res.Deadline.Format(time.RFC3339),
 	}
 }
 

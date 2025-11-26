@@ -11,7 +11,7 @@ type deliveryRepository interface {
 	Create(ctx context.Context, deliveryData delivery.Delivery) error
 	GetByOrderID(ctx context.Context, orderID string) (*delivery.Delivery, error)
 	DeleteByOrderID(ctx context.Context, orderID string) error
-	ListExpired(ctx context.Context, now time.Time) ([]delivery.Delivery, error)
+	ListActiveExpired(ctx context.Context, now time.Time) ([]delivery.Delivery, error)
 	UpdateStatusByIDs(ctx context.Context, ids []int64, status delivery.DeliveryStatus) error
 }
 
@@ -20,5 +20,8 @@ type courierRepository interface {
 	GetAvailableWithMinDeliveries(ctx context.Context) (*courier.Courier, error)
 	Update(ctx context.Context, courierData courier.Courier) error
 	UpdateStatusBatch(ctx context.Context, ids []int64, status courier.CourierStatus) error
-	IncrementDeliveriesBatch(ctx context.Context, courierIDs []int64) error
+}
+
+type transactionManager interface {
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }

@@ -83,7 +83,7 @@ func main() {
 		}
 	}()
 
-	waitGracefulShutdown(ctx, cancel, srv, dbPool, serverErr, &wg)
+	waitGracefulShutdown(cancel, srv, dbPool, serverErr, &wg)
 
 	log.Println("Shutting down service-courier")
 }
@@ -106,7 +106,6 @@ func resolvePort() string {
 }
 
 func waitGracefulShutdown(
-	rootCtx context.Context,
 	cancel context.CancelFunc,
 	srv *http.Server,
 	dbPool *pgxpool.Pool,

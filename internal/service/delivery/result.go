@@ -6,10 +6,10 @@ import (
 )
 
 type AssignResult struct {
-	CourierID        int64
-	OrderID          string
-	TransportType    courier.TransportType
-	DeliveryDeadline time.Time
+	CourierID     int64
+	OrderID       string
+	TransportType courier.TransportType
+	Deadline      time.Time
 }
 
 type UnassignResult struct {

@@ -8,22 +8,20 @@ import (
 	"service-courier/internal/model/courier"
 	"service-courier/internal/model/delivery"
 	"time"
-
-	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 )
 
 type Service struct {
 	deliveryRepo deliveryRepository
 	courierRepo  courierRepository
 	timeFactory  *DeliveryTimeFactory
-	txManager    *manager.Manager
+	txManager    transactionManager
 }
 
 func NewDeliveryService(
 	deliveryRepo deliveryRepository,
 	courierRepo courierRepository,
 	timeFactory *DeliveryTimeFactory,
-	txManager *manager.Manager,
+	txManager transactionManager,
 ) *Service {
 	return &Service{
 		deliveryRepo: deliveryRepo,
@@ -71,10 +69,10 @@ func (s *Service) AssignCourier(ctx context.Context, orderID string) (*AssignRes
 		}
 
 		result = &AssignResult{
-			CourierID:        availableCourier.ID,
-			OrderID:          orderID,
-			TransportType:    availableCourier.TransportType,
-			DeliveryDeadline: deadline,
+			CourierID:     availableCourier.ID,
+			OrderID:       orderID,
+			TransportType: availableCourier.TransportType,
+			Deadline:      deadline,
 		}
 		return nil
 	})
@@ -132,7 +130,7 @@ func (s *Service) UnassignCourier(ctx context.Context, orderID string) (*Unassig
 
 func (s *Service) ReleaseExpiredCouriers(ctx context.Context) error {
 	err := s.txManager.Do(ctx, func(ctx context.Context) error {
-		expired, err := s.deliveryRepo.ListExpired(ctx, time.Now())
+		expired, err := s.deliveryRepo.ListActiveExpired(ctx, time.Now())
 		if err != nil {
 			return fmt.Errorf("list expired: %w", err)
 		}
@@ -159,10 +157,6 @@ func (s *Service) ReleaseExpiredCouriers(ctx context.Context) error {
 
 		if err := s.deliveryRepo.UpdateStatusByIDs(ctx, deliveryIDs, delivery.StatusCompleted); err != nil {
 			return fmt.Errorf("update delivery status: %w", err)
-		}
-
-		if err := s.courierRepo.IncrementDeliveriesBatch(ctx, courierIDs); err != nil {
-			return fmt.Errorf("increment deliveries batch: %w", err)
 		}
 
 		if err := s.courierRepo.UpdateStatusBatch(ctx, courierIDs, courier.StatusAvailable); err != nil {

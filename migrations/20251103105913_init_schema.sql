@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS couriers (
     phone               TEXT NOT NULL UNIQUE,
     status              TEXT NOT NULL DEFAULT 'available',
     transport_type      TEXT NOT NULL DEFAULT 'on_foot',
-    total_deliveries    BIGINT DEFAULT 0,
     created_at          TIMESTAMP DEFAULT now(),
     updated_at          TIMESTAMP DEFAULT now()
 );

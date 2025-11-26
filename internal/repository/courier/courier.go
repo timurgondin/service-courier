@@ -27,7 +27,7 @@ func NewCourierRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, error) {
 	query := r.queryBuilder.
-		Select("id", "name", "phone", "status", "transport_type", "total_deliveries", "created_at", "updated_at").
+		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
 		From("couriers").
 		Where(squirrel.Eq{"id": id})
 
@@ -43,7 +43,6 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, e
 		&courierData.Phone,
 		&courierData.Status,
 		&courierData.TransportType,
-		&courierData.TotalDeliveries,
 		&courierData.CreatedAt,
 		&courierData.UpdatedAt,
 	)
@@ -60,7 +59,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*courier.Courier, e
 
 func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 	query, args, err := r.queryBuilder.
-		Select("id", "name", "phone", "status", "transport_type", "total_deliveries", "created_at", "updated_at").
+		Select("id", "name", "phone", "status", "transport_type", "created_at", "updated_at").
 		From("couriers").
 		OrderBy("id").
 		ToSql()
@@ -85,7 +84,6 @@ func (r *Repository) GetAll(ctx context.Context) ([]courier.Courier, error) {
 			&courierData.Phone,
 			&courierData.Status,
 			&courierData.TransportType,
-			&courierData.TotalDeliveries,
 			&courierData.CreatedAt,
 			&courierData.UpdatedAt,
 		)
@@ -170,10 +168,28 @@ func (r *Repository) Update(ctx context.Context, courierData courier.Courier) er
 
 func (r *Repository) GetAvailableWithMinDeliveries(ctx context.Context) (*courier.Courier, error) {
 	query, args, err := r.queryBuilder.
-		Select("id", "name", "phone", "status", "transport_type", "total_deliveries", "created_at", "updated_at").
-		From("couriers").
-		Where(squirrel.Eq{"status": "available"}).
-		OrderBy("total_deliveries ASC", "id ASC").
+		Select(
+			"c.id",
+			"c.name",
+			"c.phone",
+			"c.status",
+			"c.transport_type",
+			"c.created_at",
+			"c.updated_at",
+		).
+		From("couriers c").
+		LeftJoin("delivery d ON d.courier_id = c.id AND d.status = 'completed'").
+		Where(squirrel.Eq{"c.status": "available"}).
+		GroupBy(
+			"c.id",
+			"c.name",
+			"c.phone",
+			"c.status",
+			"c.transport_type",
+			"c.created_at",
+			"c.updated_at",
+		).
+		OrderBy("COUNT(d.id) ASC").
 		Limit(1).
 		ToSql()
 
@@ -188,7 +204,6 @@ func (r *Repository) GetAvailableWithMinDeliveries(ctx context.Context) (*courie
 		&courierData.Phone,
 		&courierData.Status,
 		&courierData.TransportType,
-		&courierData.TotalDeliveries,
 		&courierData.CreatedAt,
 		&courierData.UpdatedAt,
 	)
@@ -201,30 +216,6 @@ func (r *Repository) GetAvailableWithMinDeliveries(ctx context.Context) (*courie
 	}
 
 	return &courierData, nil
-}
-
-func (r *Repository) IncrementDeliveriesBatch(ctx context.Context, courierIDs []int64) error {
-	if len(courierIDs) == 0 {
-		return nil
-	}
-
-	query, args, err := r.queryBuilder.
-		Update("couriers").
-		Set("total_deliveries", squirrel.Expr("total_deliveries + 1")).
-		Set("updated_at", squirrel.Expr("NOW()")).
-		Where(squirrel.Eq{"id": courierIDs}).
-		ToSql()
-
-	if err != nil {
-		return fmt.Errorf("build query: %w", err)
-	}
-
-	_, err = r.pool.Exec(ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("failed to increment deliveries: %w", err)
-	}
-
-	return nil
 }
 
 func (r *Repository) UpdateStatusBatch(ctx context.Context, ids []int64, status courier.CourierStatus) error {

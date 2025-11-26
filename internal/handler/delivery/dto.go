@@ -7,10 +7,10 @@ type AssignRequest struct {
 
 // AssignResponse ответ на назначение курьера
 type AssignResponse struct {
-	CourierID        int64  `json:"courier_id"`
-	OrderID          string `json:"order_id"`
-	TransportType    string `json:"transport_type"`
-	DeliveryDeadline string `json:"delivery_deadline"`
+	CourierID     int64  `json:"courier_id"`
+	OrderID       string `json:"order_id"`
+	TransportType string `json:"transport_type"`
+	Deadline      string `json:"delivery_deadline"`
 }
 
 // UnassignRequest запрос на снятие курьера с заказа

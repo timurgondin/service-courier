@@ -104,7 +104,7 @@ func (r *Repository) DeleteByOrderID(ctx context.Context, orderID string) error 
 	return nil
 }
 
-func (r *Repository) ListExpired(ctx context.Context, now time.Time) ([]delivery.Delivery, error) {
+func (r *Repository) ListActiveExpired(ctx context.Context, now time.Time) ([]delivery.Delivery, error) {
 	query, args, err := r.queryBuilder.
 		Select("id", "courier_id", "order_id", "status", "assigned_at", "deadline").
 		From("delivery").
