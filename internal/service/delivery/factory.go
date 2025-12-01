@@ -2,26 +2,27 @@ package delivery
 
 import (
 	"service-courier/internal/model/courier"
-	"time"
 )
 
-type DeliveryTimeFactory struct{}
-
-func NewDeliveryTimeFactory() *DeliveryTimeFactory {
-	return &DeliveryTimeFactory{}
+type TransportFactory interface {
+	Create(t courier.TransportType) Transport
 }
 
-func (f *DeliveryTimeFactory) CalculateDeadline(transportType courier.TransportType, baseTime time.Time) time.Time {
-	var duration time.Duration
+type DefaultTransportFactory struct{}
 
-	switch transportType {
+func NewTransportFactory() TransportFactory {
+	return &DefaultTransportFactory{}
+}
+
+func (f *DefaultTransportFactory) Create(t courier.TransportType) Transport {
+	switch t {
 	case courier.TransportOnFoot:
-		duration = 30 * time.Minute
+		return OnFoot{}
 	case courier.TransportScooter:
-		duration = 15 * time.Minute
+		return Scooter{}
 	case courier.TransportCar:
-		duration = 5 * time.Minute
+		return Car{}
+	default:
+		return nil
 	}
-
-	return baseTime.Add(duration)
 }

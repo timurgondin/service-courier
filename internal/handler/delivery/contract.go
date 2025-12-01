@@ -1,3 +1,5 @@
+//go:generate mockgen -source=contract.go -destination=./mocks/delivery_service_mock.go -package=mocks
+
 package delivery
 
 import (

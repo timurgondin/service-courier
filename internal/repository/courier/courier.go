@@ -178,7 +178,7 @@ func (r *Repository) GetAvailableWithMinDeliveries(ctx context.Context) (*courie
 			"c.updated_at",
 		).
 		From("couriers c").
-		LeftJoin("delivery d ON d.courier_id = c.id AND d.status = 'completed'").
+		LeftJoin("delivery d ON d.courier_id = c.id").
 		Where(squirrel.Eq{"c.status": "available"}).
 		GroupBy(
 			"c.id",

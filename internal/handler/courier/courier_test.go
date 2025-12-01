@@ -11,7 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	courierHandler "service-courier/internal/handler/courier"
-	"service-courier/internal/mocks"
+	"service-courier/internal/handler/courier/mocks"
 	model "service-courier/internal/model/courier"
 )
 

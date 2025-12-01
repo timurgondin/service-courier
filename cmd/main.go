@@ -44,15 +44,18 @@ func main() {
 
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(dbPool, ctxGetter)
-	deliveryTimeFactory := deliveryService.NewDeliveryTimeFactory()
+	deliveryTransportFactory := deliveryService.NewTransportFactory()
 
 	txManager := manager.Must(trmpgx.NewDefaultFactory(dbPool))
+
+	clock := deliveryService.RealClock{}
 
 	deliverySvc := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		deliveryTimeFactory,
+		deliveryTransportFactory,
 		txManager,
+		clock,
 	)
 	delivery := deliveryHandler.NewDeliveryHandler(deliverySvc)
 

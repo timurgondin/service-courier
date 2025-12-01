@@ -3,9 +3,12 @@ package delivery
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"service-courier/internal/model/courier"
 	"service-courier/internal/model/delivery"
+
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -25,15 +28,16 @@ func (h *Handler) Assign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.OrderID == "" {
+	if _, err := uuid.Parse(req.OrderID); err != nil {
 		h.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "Invalid JSON",
+			"error": "Invalid order_id",
 		})
 		return
 	}
 
 	result, err := h.service.AssignCourier(r.Context(), req.OrderID)
 	if err != nil {
+		log.Printf("assign courier: %v", err)
 		h.writeError(w, err)
 		return
 	}
@@ -49,19 +53,22 @@ func (h *Handler) Unassign(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if req.OrderID == "" {
+
+	if _, err := uuid.Parse(req.OrderID); err != nil {
 		h.writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error": "Invalid JSON",
+			"error": "Invalid order_id",
 		})
 		return
 	}
+
 	result, err := h.service.UnassignCourier(r.Context(), req.OrderID)
 	if err != nil {
+		log.Printf("unassign courier: %v", err)
 		h.writeError(w, err)
 		return
 	}
-	h.writeJSON(w, http.StatusOK, ResultToUnassignResponse(*result))
 
+	h.writeJSON(w, http.StatusOK, ResultToUnassignResponse(*result))
 }
 
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, data interface{}) {

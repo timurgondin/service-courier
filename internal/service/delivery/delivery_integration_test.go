@@ -26,14 +26,18 @@ func TestDeliveryService_AssignCourier_Integration(t *testing.T) {
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	courierRepository := courierRepo.NewCourierRepository(pool)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
 	txManager := manager.Must(trmpgx.NewDefaultFactory(pool))
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		timeFactory,
+		transportFactory,
 		txManager,
+		clock,
 	)
 	ctx := context.Background()
 
@@ -48,7 +52,7 @@ func TestDeliveryService_AssignCourier_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Назначаем курьера на заказ
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	result, err := service.AssignCourier(ctx, orderID)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -77,14 +81,18 @@ func TestDeliveryService_AssignCourier_OrderAlreadyAssigned(t *testing.T) {
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	courierRepository := courierRepo.NewCourierRepository(pool)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
 	txManager := manager.Must(trmpgx.NewDefaultFactory(pool))
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		timeFactory,
+		transportFactory,
 		txManager,
+		clock,
 	)
 	ctx := context.Background()
 
@@ -98,7 +106,7 @@ func TestDeliveryService_AssignCourier_OrderAlreadyAssigned(t *testing.T) {
 	courierID, err := courierRepository.Create(ctx, courierData)
 	require.NoError(t, err)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	deliveryData := modelDelivery.Delivery{
 		CourierID:  courierID,
 		OrderID:    orderID,
@@ -122,14 +130,18 @@ func TestDeliveryService_AssignCourier_NoAvailableCouriers(t *testing.T) {
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	courierRepository := courierRepo.NewCourierRepository(pool)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
 	txManager := manager.Must(trmpgx.NewDefaultFactory(pool))
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		timeFactory,
+		transportFactory,
 		txManager,
+		clock,
 	)
 	ctx := context.Background()
 
@@ -144,7 +156,7 @@ func TestDeliveryService_AssignCourier_NoAvailableCouriers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Пытаемся назначить курьера на заказ
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	result, err := service.AssignCourier(ctx, orderID)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, modelCourier.ErrNoAvailableCouriers)
@@ -158,14 +170,18 @@ func TestDeliveryService_UnassignCourier_Integration(t *testing.T) {
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	courierRepository := courierRepo.NewCourierRepository(pool)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
 	txManager := manager.Must(trmpgx.NewDefaultFactory(pool))
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		timeFactory,
+		transportFactory,
 		txManager,
+		clock,
 	)
 	ctx := context.Background()
 
@@ -179,7 +195,7 @@ func TestDeliveryService_UnassignCourier_Integration(t *testing.T) {
 	courierID, err := courierRepository.Create(ctx, courierData)
 	require.NoError(t, err)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	deliveryData := modelDelivery.Delivery{
 		CourierID:  courierID,
 		OrderID:    orderID,
@@ -195,7 +211,7 @@ func TestDeliveryService_UnassignCourier_Integration(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Equal(t, orderID, result.OrderID)
 	assert.Equal(t, courierID, result.CourierID)
-	assert.Equal(t, "unassigned", result.Status)
+	assert.Equal(t, modelDelivery.StatusUnassigned, result.Status)
 
 	// Проверяем, что доставка удалена
 	_, err = deliveryRepository.GetByOrderID(ctx, orderID)
@@ -215,19 +231,23 @@ func TestDeliveryService_UnassignCourier_DeliveryNotFound(t *testing.T) {
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	courierRepository := courierRepo.NewCourierRepository(pool)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
 	txManager := manager.Must(trmpgx.NewDefaultFactory(pool))
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		timeFactory,
+		transportFactory,
 		txManager,
+		clock,
 	)
 	ctx := context.Background()
 
 	// Пытаемся снять курьера с несуществующего заказа
-	result, err := service.UnassignCourier(ctx, "non-existent")
+	result, err := service.UnassignCourier(ctx, "c3d7a96d-fbb3-4ea0-a1e6-06023a23b83b")
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, modelDelivery.ErrDeliveryNotFound)
 	assert.Nil(t, result)
@@ -240,14 +260,18 @@ func TestDeliveryService_Transaction_RollbackOnError(t *testing.T) {
 	ctxGetter := trmpgx.DefaultCtxGetter
 	deliveryRepository := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	courierRepository := courierRepo.NewCourierRepository(pool)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
 	txManager := manager.Must(trmpgx.NewDefaultFactory(pool))
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		deliveryRepository,
 		courierRepository,
-		timeFactory,
+		transportFactory,
 		txManager,
+		clock,
 	)
 	ctx := context.Background()
 
@@ -262,7 +286,7 @@ func TestDeliveryService_Transaction_RollbackOnError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Назначаем курьера на заказ
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	result1, err := service.AssignCourier(ctx, orderID)
 	require.NoError(t, err)
 	assert.NotNil(t, result1)

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	deliveryHandler "service-courier/internal/handler/delivery"
-	"service-courier/internal/mocks"
+	"service-courier/internal/handler/delivery/mocks"
 	modelCourier "service-courier/internal/model/courier"
 	modelDelivery "service-courier/internal/model/delivery"
 	dtoDelivery "service-courier/internal/service/delivery"
@@ -26,9 +26,9 @@ func TestAssignCourier_Success(t *testing.T) {
 	mockService := mocks.NewMockdeliveryService(ctrl)
 
 	mockService.EXPECT().
-		AssignCourier(gomock.Any(), "order-1").
+		AssignCourier(gomock.Any(), "f819526d-6a7c-48eb-b535-43989469d1ca").
 		Return(&dtoDelivery.AssignResult{
-			OrderID:       "order-1",
+			OrderID:       "f819526d-6a7c-48eb-b535-43989469d1ca",
 			CourierID:     10,
 			TransportType: "car",
 			Deadline:      time.Date(2025, 11, 30, 12, 0, 0, 0, time.UTC),
@@ -38,7 +38,7 @@ func TestAssignCourier_Success(t *testing.T) {
 	r := chi.NewRouter()
 	r.Post("/delivery/assign", h.Assign)
 
-	body := `{"order_id":"order-1"}`
+	body := `{"order_id":"f819526d-6a7c-48eb-b535-43989469d1ca"}`
 	req := httptest.NewRequest("POST", "/delivery/assign", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
@@ -55,8 +55,8 @@ func TestAssignCourier_Success(t *testing.T) {
 	if resp.CourierID != 10 {
 		t.Fatalf("expected courier_id=10, got %d", resp.CourierID)
 	}
-	if resp.OrderID != "order-1" {
-		t.Fatalf("expected order_id='order-1', got %s", resp.OrderID)
+	if resp.OrderID != "f819526d-6a7c-48eb-b535-43989469d1ca" {
+		t.Fatalf("expected order_id='f819526d-6a7c-48eb-b535-43989469d1ca', got %s", resp.OrderID)
 	}
 	if resp.TransportType != "car" {
 		t.Fatalf("expected transport_type='car', got %s", resp.TransportType)
@@ -109,14 +109,14 @@ func TestAssignCourier_OrderAlreadyAssigned(t *testing.T) {
 	defer ctrl.Finish()
 	mockService := mocks.NewMockdeliveryService(ctrl)
 	mockService.EXPECT().
-		AssignCourier(gomock.Any(), "order-1").
+		AssignCourier(gomock.Any(), "f819526d-6a7c-48eb-b535-43989469d1ca").
 		Return(nil, modelDelivery.ErrOrderAlreadyAssigned)
 
 	h := deliveryHandler.NewDeliveryHandler(mockService)
 	r := chi.NewRouter()
 	r.Post("/delivery/assign", h.Assign)
 
-	body := `{"order_id":"order-1"}`
+	body := `{"order_id":"f819526d-6a7c-48eb-b535-43989469d1ca"}`
 	req := httptest.NewRequest("POST", "/delivery/assign", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
@@ -132,14 +132,14 @@ func TestAssignCourier_NoAvailableCouriers(t *testing.T) {
 	defer ctrl.Finish()
 	mockService := mocks.NewMockdeliveryService(ctrl)
 	mockService.EXPECT().
-		AssignCourier(gomock.Any(), "order-1").
+		AssignCourier(gomock.Any(), "f819526d-6a7c-48eb-b535-43989469d1ca").
 		Return(nil, modelCourier.ErrNoAvailableCouriers)
 
 	h := deliveryHandler.NewDeliveryHandler(mockService)
 	r := chi.NewRouter()
 	r.Post("/delivery/assign", h.Assign)
 
-	body := `{"order_id":"order-1"}`
+	body := `{"order_id":"f819526d-6a7c-48eb-b535-43989469d1ca"}`
 	req := httptest.NewRequest("POST", "/delivery/assign", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
@@ -155,18 +155,18 @@ func TestUnassignCourier_Success(t *testing.T) {
 	defer ctrl.Finish()
 	mockService := mocks.NewMockdeliveryService(ctrl)
 	mockService.EXPECT().
-		UnassignCourier(gomock.Any(), "order-1").
+		UnassignCourier(gomock.Any(), "f819526d-6a7c-48eb-b535-43989469d1ca").
 		Return(&dtoDelivery.UnassignResult{
-			OrderID:   "order-1",
+			OrderID:   "f819526d-6a7c-48eb-b535-43989469d1ca",
 			CourierID: 10,
-			Status:    "unassigned",
+			Status:    modelDelivery.StatusUnassigned,
 		}, nil)
 
 	h := deliveryHandler.NewDeliveryHandler(mockService)
 	r := chi.NewRouter()
 	r.Post("/delivery/unassign", h.Unassign)
 
-	body := `{"order_id":"order-1"}`
+	body := `{"order_id":"f819526d-6a7c-48eb-b535-43989469d1ca"}`
 	req := httptest.NewRequest("POST", "/delivery/unassign", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
@@ -182,10 +182,10 @@ func TestUnassignCourier_Success(t *testing.T) {
 	if resp.CourierID != 10 {
 		t.Fatalf("expected courier_id=10, got %d", resp.CourierID)
 	}
-	if resp.OrderID != "order-1" {
-		t.Fatalf("expected order_id='order-1', got %s", resp.OrderID)
+	if resp.OrderID != "f819526d-6a7c-48eb-b535-43989469d1ca" {
+		t.Fatalf("expected order_id='f819526d-6a7c-48eb-b535-43989469d1ca', got %s", resp.OrderID)
 	}
-	if resp.Status != "unassigned" {
+	if resp.Status != modelDelivery.StatusUnassigned {
 		t.Fatalf("expected status='unassigned', got %s", resp.Status)
 	}
 }
@@ -233,14 +233,14 @@ func TestUnassignCourier_DeliveryNotFound(t *testing.T) {
 	defer ctrl.Finish()
 	mockService := mocks.NewMockdeliveryService(ctrl)
 	mockService.EXPECT().
-		UnassignCourier(gomock.Any(), "order-1").
+		UnassignCourier(gomock.Any(), "f819526d-6a7c-48eb-b535-43989469d1ca").
 		Return(nil, modelDelivery.ErrDeliveryNotFound)
 
 	h := deliveryHandler.NewDeliveryHandler(mockService)
 	r := chi.NewRouter()
 	r.Post("/delivery/unassign", h.Unassign)
 
-	body := `{"order_id":"order-1"}`
+	body := `{"order_id":"f819526d-6a7c-48eb-b535-43989469d1ca"}`
 	req := httptest.NewRequest("POST", "/delivery/unassign", bytes.NewBufferString(body))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)

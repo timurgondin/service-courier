@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"go.uber.org/mock/gomock"
 
-	"service-courier/internal/mocks"
 	modelCourier "service-courier/internal/model/courier"
 	modelDelivery "service-courier/internal/model/delivery"
 	deliveryService "service-courier/internal/service/delivery"
+	"service-courier/internal/service/delivery/mocks"
 )
 
 func TestAssignCourier_Success(t *testing.T) {
@@ -19,18 +20,22 @@ func TestAssignCourier_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	availableCourier := &modelCourier.Courier{
 		ID:            10,
 		Name:          "Ivan",
@@ -87,18 +92,22 @@ func TestAssignCourier_OrderAlreadyAssigned(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	existingDelivery := &modelDelivery.Delivery{
 		ID:        1,
 		OrderID:   orderID,
@@ -134,18 +143,22 @@ func TestAssignCourier_NoAvailableCouriers(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 
 	mockTxManager.EXPECT().
 		Do(gomock.Any(), gomock.Any()).
@@ -179,18 +192,22 @@ func TestAssignCourier_GetByOrderIDError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	repoErr := errors.New("database error")
 
 	mockTxManager.EXPECT().
@@ -218,18 +235,22 @@ func TestAssignCourier_CreateDeliveryError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	availableCourier := &modelCourier.Courier{
 		ID:            10,
 		Status:        modelCourier.StatusAvailable,
@@ -270,18 +291,22 @@ func TestAssignCourier_UpdateCourierError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	availableCourier := &modelCourier.Courier{
 		ID:            10,
 		Status:        modelCourier.StatusAvailable,
@@ -326,18 +351,22 @@ func TestUnassignCourier_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	deliveryData := &modelDelivery.Delivery{
 		ID:        1,
 		OrderID:   orderID,
@@ -386,7 +415,7 @@ func TestUnassignCourier_Success(t *testing.T) {
 	if result.CourierID != 10 {
 		t.Fatalf("expected CourierID=10, got %d", result.CourierID)
 	}
-	if result.Status != "unassigned" {
+	if result.Status != modelDelivery.StatusUnassigned {
 		t.Fatalf("expected Status=unassigned, got %s", result.Status)
 	}
 }
@@ -397,18 +426,22 @@ func TestUnassignCourier_DeliveryNotFound(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 
 	mockTxManager.EXPECT().
 		Do(gomock.Any(), gomock.Any()).
@@ -438,18 +471,22 @@ func TestUnassignCourier_GetByOrderIDError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	repoErr := errors.New("database error")
 
 	mockTxManager.EXPECT().
@@ -477,18 +514,22 @@ func TestUnassignCourier_DeleteError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	deliveryData := &modelDelivery.Delivery{
 		ID:        1,
 		OrderID:   orderID,
@@ -526,18 +567,22 @@ func TestUnassignCourier_GetCourierError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	deliveryData := &modelDelivery.Delivery{
 		ID:        1,
 		OrderID:   orderID,
@@ -579,18 +624,22 @@ func TestUnassignCourier_UpdateCourierError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
-	orderID := "order-1"
+	orderID := "f819526d-6a7c-48eb-b535-43989469d1ca"
 	deliveryData := &modelDelivery.Delivery{
 		ID:        1,
 		OrderID:   orderID,
@@ -640,21 +689,25 @@ func TestReleaseExpiredCouriers_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
 	expiredDeliveries := []modelDelivery.Delivery{
-		{ID: 1, CourierID: 10, OrderID: "order-1", Status: modelDelivery.StatusActive},
-		{ID: 2, CourierID: 10, OrderID: "order-2", Status: modelDelivery.StatusActive},
-		{ID: 3, CourierID: 20, OrderID: "order-3", Status: modelDelivery.StatusActive},
+		{ID: 1, CourierID: 10, OrderID: "f819526d-6a7c-48eb-b535-43989469d1ca", Status: modelDelivery.StatusActive},
+		{ID: 2, CourierID: 10, OrderID: "e00b99da-4812-4401-8f54-af2cba66b819", Status: modelDelivery.StatusActive},
+		{ID: 3, CourierID: 20, OrderID: "83f6bfb1-b6e9-48b5-b562-d090ee0e1df4", Status: modelDelivery.StatusActive},
 	}
 
 	mockTxManager.EXPECT().
@@ -687,15 +740,19 @@ func TestReleaseExpiredCouriers_NoExpired(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
 	mockTxManager.EXPECT().
@@ -720,15 +777,19 @@ func TestReleaseExpiredCouriers_ListError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
 	repoErr := errors.New("list expired error")
@@ -755,19 +816,23 @@ func TestReleaseExpiredCouriers_UpdateDeliveryStatusError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
 	expiredDeliveries := []modelDelivery.Delivery{
-		{ID: 1, CourierID: 10, OrderID: "order-1", Status: modelDelivery.StatusActive},
+		{ID: 1, CourierID: 10, OrderID: "f819526d-6a7c-48eb-b535-43989469d1ca", Status: modelDelivery.StatusActive},
 	}
 	repoErr := errors.New("update delivery status error")
 
@@ -797,19 +862,23 @@ func TestReleaseExpiredCouriers_UpdateCourierStatusError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDeliveryRepo := mocks.NewMockdeliveryRepository(ctrl)
-	mockCourierRepo := mocks.NewMockDeliveryCourierRepository(ctrl)
+	mockCourierRepo := mocks.NewMockcourierRepository(ctrl)
 	mockTxManager := mocks.NewMocktransactionManager(ctrl)
-	timeFactory := deliveryService.NewDeliveryTimeFactory()
+	transportFactory := deliveryService.NewTransportFactory()
+
+	fixed := time.Date(2024, 1, 1, 12, 00, 00, 0, time.UTC)
+	clock := deliveryService.NewFixedClock(fixed)
 
 	service := deliveryService.NewDeliveryService(
 		mockDeliveryRepo,
 		mockCourierRepo,
-		timeFactory,
+		transportFactory,
 		mockTxManager,
+		clock,
 	)
 
 	expiredDeliveries := []modelDelivery.Delivery{
-		{ID: 1, CourierID: 10, OrderID: "order-1", Status: modelDelivery.StatusActive},
+		{ID: 1, CourierID: 10, OrderID: "f819526d-6a7c-48eb-b535-43989469d1ca", Status: modelDelivery.StatusActive},
 	}
 	repoErr := errors.New("update courier status error")
 

@@ -8,9 +8,9 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"service-courier/internal/mocks"
 	model "service-courier/internal/model/courier"
 	courierService "service-courier/internal/service/courier"
+	"service-courier/internal/service/courier/mocks"
 )
 
 func TestGetCourier_Success(t *testing.T) {

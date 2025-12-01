@@ -6,17 +6,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	deliveryService "service-courier/internal/service/delivery"
 	modelCourier "service-courier/internal/model/courier"
+	deliveryService "service-courier/internal/service/delivery"
 )
 
 func TestDeliveryTimeFactory_CalculateDeadline_OnFoot(t *testing.T) {
 	t.Parallel()
 
-	factory := deliveryService.NewDeliveryTimeFactory()
+	factory := deliveryService.NewTransportFactory()
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	deadline := factory.CalculateDeadline(modelCourier.TransportOnFoot, baseTime)
+	transport := factory.Create(modelCourier.TransportOnFoot)
+	deadline := baseTime.Add(transport.DeliveryDuration())
 
 	expected := baseTime.Add(30 * time.Minute)
 	assert.Equal(t, expected, deadline)
@@ -25,10 +26,11 @@ func TestDeliveryTimeFactory_CalculateDeadline_OnFoot(t *testing.T) {
 func TestDeliveryTimeFactory_CalculateDeadline_Scooter(t *testing.T) {
 	t.Parallel()
 
-	factory := deliveryService.NewDeliveryTimeFactory()
+	factory := deliveryService.NewTransportFactory()
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	deadline := factory.CalculateDeadline(modelCourier.TransportScooter, baseTime)
+	transport := factory.Create(modelCourier.TransportScooter)
+	deadline := baseTime.Add(transport.DeliveryDuration())
 
 	expected := baseTime.Add(15 * time.Minute)
 	assert.Equal(t, expected, deadline)
@@ -37,10 +39,11 @@ func TestDeliveryTimeFactory_CalculateDeadline_Scooter(t *testing.T) {
 func TestDeliveryTimeFactory_CalculateDeadline_Car(t *testing.T) {
 	t.Parallel()
 
-	factory := deliveryService.NewDeliveryTimeFactory()
+	factory := deliveryService.NewTransportFactory()
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	deadline := factory.CalculateDeadline(modelCourier.TransportCar, baseTime)
+	transport := factory.Create(modelCourier.TransportCar)
+	deadline := baseTime.Add(transport.DeliveryDuration())
 
 	expected := baseTime.Add(5 * time.Minute)
 	assert.Equal(t, expected, deadline)

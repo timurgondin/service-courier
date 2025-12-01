@@ -61,8 +61,12 @@ func (r *Repository) GetByOrderID(ctx context.Context, orderID string) (*deliver
 	query, args, err := r.queryBuilder.
 		Select("id", "courier_id", "order_id", "status", "assigned_at", "deadline").
 		From("delivery").
-		Where(squirrel.Eq{"order_id": orderID}).
+		Where(squirrel.And{
+			squirrel.Eq{"order_id": orderID},
+			squirrel.Eq{"deleted_at": nil},
+		}).
 		ToSql()
+
 	if err != nil {
 		return nil, fmt.Errorf("build query: %w", err)
 	}
@@ -87,7 +91,9 @@ func (r *Repository) GetByOrderID(ctx context.Context, orderID string) (*deliver
 
 func (r *Repository) DeleteByOrderID(ctx context.Context, orderID string) error {
 	query, args, err := r.queryBuilder.
-		Delete("delivery").
+		Update("delivery").
+		Set("deleted_at", squirrel.Expr("NOW()")).
+		Set("status", delivery.StatusDeleted).
 		Where(squirrel.Eq{"order_id": orderID}).
 		ToSql()
 	if err != nil {
@@ -111,6 +117,7 @@ func (r *Repository) ListActiveExpired(ctx context.Context, now time.Time) ([]de
 		Where(squirrel.And{
 			squirrel.Lt{"deadline": now},
 			squirrel.Eq{"status": delivery.StatusActive},
+			squirrel.Eq{"deleted_at": nil},
 		}).
 		ToSql()
 

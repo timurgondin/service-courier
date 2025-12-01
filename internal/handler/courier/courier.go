@@ -3,6 +3,7 @@ package courier
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"service-courier/internal/model/courier"
 	"strconv"
@@ -30,6 +31,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	courierData, err := h.service.GetCourier(r.Context(), id)
 	if err != nil {
+		log.Printf("get courier: %v", err)
 		h.writeError(w, err)
 		return
 	}
@@ -40,6 +42,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	couriers, err := h.service.GetAllCouriers(r.Context())
 	if err != nil {
+		log.Printf("get all couriers: %v", err)
 		h.writeError(w, err)
 		return
 	}
@@ -70,6 +73,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.service.CreateCourier(r.Context(), req.ToModel())
 	if err != nil {
+		log.Printf("create courier: %v", err)
 		h.writeError(w, err)
 		return
 	}
@@ -98,6 +102,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.UpdateCourier(r.Context(), req.ToModel())
 	if err != nil {
+		log.Printf("update courier: %v", err)
 		h.writeError(w, err)
 		return
 	}

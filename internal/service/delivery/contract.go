@@ -1,3 +1,6 @@
+//go:generate mockgen -destination=./mocks/delivery_repository_mock.go -package=mocks service-courier/internal/service/delivery deliveryRepository
+//go:generate mockgen -destination=./mocks/courier_repository_mock.go -package=mocks service-courier/internal/service/delivery courierRepository
+//go:generate mockgen -destination=./mocks/transaction_manager_mock.go -package=mocks service-courier/internal/service/delivery transactionManager
 package delivery
 
 import (

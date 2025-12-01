@@ -1,5 +1,7 @@
 package delivery_test
 
+//go:generate mockgen -destination=internal/mocks/delivery_repository_mock.go -package=mocks service-courier/internal/service/delivery deliveryRepository
+
 import (
 	"context"
 	"testing"
@@ -39,7 +41,7 @@ func TestDeliveryRepository_Create(t *testing.T) {
 	// Создаем доставку
 	deliveryData := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-1",
+		OrderID:    "f819526d-6a7c-48eb-b535-43989469d1ca",
 		AssignedAt: time.Now(),
 		Deadline:   time.Now().Add(30 * time.Minute),
 	}
@@ -48,7 +50,7 @@ func TestDeliveryRepository_Create(t *testing.T) {
 	require.NoError(t, err)
 
 	// Проверяем, что доставка создана
-	result, err := repo.GetByOrderID(ctx, "order-1")
+	result, err := repo.GetByOrderID(ctx, "f819526d-6a7c-48eb-b535-43989469d1ca")
 	require.NoError(t, err)
 	assert.Greater(t, result.ID, int64(0))
 	assert.Equal(t, deliveryData.OrderID, result.OrderID)
@@ -77,7 +79,7 @@ func TestDeliveryRepository_GetByOrderID(t *testing.T) {
 
 	deliveryData := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-1",
+		OrderID:    "f819526d-6a7c-48eb-b535-43989469d1ca",
 		AssignedAt: time.Now(),
 		Deadline:   time.Now().Add(30 * time.Minute),
 	}
@@ -85,7 +87,7 @@ func TestDeliveryRepository_GetByOrderID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Получаем доставку
-	result, err := repo.GetByOrderID(ctx, "order-1")
+	result, err := repo.GetByOrderID(ctx, "f819526d-6a7c-48eb-b535-43989469d1ca")
 	require.NoError(t, err)
 	assert.Greater(t, result.ID, int64(0))
 	assert.Equal(t, deliveryData.OrderID, result.OrderID)
@@ -102,7 +104,7 @@ func TestDeliveryRepository_GetByOrderID_NotFound(t *testing.T) {
 	repo := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	ctx := context.Background()
 
-	result, err := repo.GetByOrderID(ctx, "non-existent")
+	result, err := repo.GetByOrderID(ctx, "c3d7a96d-fbb3-4ea0-a1e6-06023a23b83b")
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, modelDelivery.ErrDeliveryNotFound)
 	assert.Nil(t, result)
@@ -129,7 +131,7 @@ func TestDeliveryRepository_DeleteByOrderID(t *testing.T) {
 
 	deliveryData := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-1",
+		OrderID:    "f819526d-6a7c-48eb-b535-43989469d1ca",
 		AssignedAt: time.Now(),
 		Deadline:   time.Now().Add(30 * time.Minute),
 	}
@@ -137,11 +139,11 @@ func TestDeliveryRepository_DeleteByOrderID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Удаляем доставку
-	err = repo.DeleteByOrderID(ctx, "order-1")
+	err = repo.DeleteByOrderID(ctx, "f819526d-6a7c-48eb-b535-43989469d1ca")
 	require.NoError(t, err)
 
 	// Проверяем, что доставка удалена
-	result, err := repo.GetByOrderID(ctx, "order-1")
+	result, err := repo.GetByOrderID(ctx, "f819526d-6a7c-48eb-b535-43989469d1ca")
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, modelDelivery.ErrDeliveryNotFound)
 	assert.Nil(t, result)
@@ -155,7 +157,7 @@ func TestDeliveryRepository_DeleteByOrderID_NotFound(t *testing.T) {
 	repo := deliveryRepo.NewDeliveryRepository(pool, ctxGetter)
 	ctx := context.Background()
 
-	err := repo.DeleteByOrderID(ctx, "non-existent")
+	err := repo.DeleteByOrderID(ctx, "c3d7a96d-fbb3-4ea0-a1e6-06023a23b83b")
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, modelDelivery.ErrDeliveryNotFound)
 }
@@ -184,7 +186,7 @@ func TestDeliveryRepository_ListActiveExpired(t *testing.T) {
 	expiredDeadline := baseTime.Add(-1 * time.Hour)
 	expiredDelivery := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-expired",
+		OrderID:    "65ae96c6-abff-424b-83fe-92403a4678e1",
 		AssignedAt: baseTime.Add(-2 * time.Hour),
 		Deadline:   expiredDeadline,
 	}
@@ -194,7 +196,7 @@ func TestDeliveryRepository_ListActiveExpired(t *testing.T) {
 	// Создаем активную доставку (не просроченную)
 	activeDelivery := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-active",
+		OrderID:    "72e9c6de-f88b-47b3-968d-0d9bff7af1e1",
 		AssignedAt: baseTime,
 		Deadline:   baseTime.Add(30 * time.Minute),
 	}
@@ -212,7 +214,7 @@ func TestDeliveryRepository_ListActiveExpired(t *testing.T) {
 	// Проверяем, что найдена просроченная доставка
 	found := false
 	for _, d := range expired {
-		if d.OrderID == "order-expired" {
+		if d.OrderID == "65ae96c6-abff-424b-83fe-92403a4678e1" {
 			found = true
 			assert.EqualValues(t, modelDelivery.StatusActive, d.Status)
 			assert.True(t, d.Deadline.Before(checkTime.Add(1*time.Second)),
@@ -223,7 +225,7 @@ func TestDeliveryRepository_ListActiveExpired(t *testing.T) {
 
 	// Проверяем, что не просроченная доставка не попала в список
 	for _, d := range expired {
-		assert.NotEqual(t, "order-active", d.OrderID, "active delivery should not be in expired list")
+		assert.NotEqual(t, "72e9c6de-f88b-47b3-968d-0d9bff7af1e1", d.OrderID, "active delivery should not be in expired list")
 	}
 }
 
@@ -251,7 +253,7 @@ func TestDeliveryRepository_ListActiveExpired_NoExpired(t *testing.T) {
 	// Создаем только активную доставку (не просроченную)
 	activeDelivery := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-active",
+		OrderID:    "72e9c6de-f88b-47b3-968d-0d9bff7af1e1",
 		AssignedAt: now,
 		Deadline:   now.Add(30 * time.Minute),
 	}
@@ -288,7 +290,7 @@ func TestDeliveryRepository_UpdateStatusByIDs(t *testing.T) {
 	// Создаем несколько доставок
 	delivery1 := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-1",
+		OrderID:    "f819526d-6a7c-48eb-b535-43989469d1ca",
 		AssignedAt: now,
 		Deadline:   now.Add(30 * time.Minute),
 	}
@@ -296,14 +298,14 @@ func TestDeliveryRepository_UpdateStatusByIDs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Получаем ID из созданной доставки
-	created1, err := repo.GetByOrderID(ctx, "order-1")
+	created1, err := repo.GetByOrderID(ctx, "f819526d-6a7c-48eb-b535-43989469d1ca")
 	require.NoError(t, err)
 	delivery1ID := created1.ID
 	require.Greater(t, delivery1ID, int64(0), "delivery1.ID should be set")
 
 	delivery2 := modelDelivery.Delivery{
 		CourierID:  courierID,
-		OrderID:    "order-2",
+		OrderID:    "e00b99da-4812-4401-8f54-af2cba66b819",
 		AssignedAt: now,
 		Deadline:   now.Add(30 * time.Minute),
 	}
@@ -311,7 +313,7 @@ func TestDeliveryRepository_UpdateStatusByIDs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Получаем ID из созданной доставки
-	created2, err := repo.GetByOrderID(ctx, "order-2")
+	created2, err := repo.GetByOrderID(ctx, "e00b99da-4812-4401-8f54-af2cba66b819")
 	require.NoError(t, err)
 	delivery2ID := created2.ID
 	require.Greater(t, delivery2ID, int64(0), "delivery2.ID should be set")
@@ -321,11 +323,11 @@ func TestDeliveryRepository_UpdateStatusByIDs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Проверяем обновление
-	result1, err := repo.GetByOrderID(ctx, "order-1")
+	result1, err := repo.GetByOrderID(ctx, "f819526d-6a7c-48eb-b535-43989469d1ca")
 	require.NoError(t, err)
 	assert.Equal(t, string(modelDelivery.StatusCompleted), string(result1.Status))
 
-	result2, err := repo.GetByOrderID(ctx, "order-2")
+	result2, err := repo.GetByOrderID(ctx, "e00b99da-4812-4401-8f54-af2cba66b819")
 	require.NoError(t, err)
 	assert.Equal(t, string(modelDelivery.StatusCompleted), string(result2.Status))
 }

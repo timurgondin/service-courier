@@ -16,4 +16,7 @@ type DeliveryStatus string
 const (
 	StatusActive    = "active"
 	StatusCompleted = "completed"
+	StatusDeleted   = "deleted"
 )
+
+const StatusUnassigned = "unassigned"

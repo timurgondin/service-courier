@@ -1,3 +1,4 @@
+//go:generate mockgen -source=contract.go -destination=./mocks/courier_repository_mock.go -package=mocks
 package courier
 
 import (
