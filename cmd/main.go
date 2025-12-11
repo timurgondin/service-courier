@@ -8,14 +8,21 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
 	"service-courier/internal/handler/common"
 	courierHandler "service-courier/internal/handler/courier"
+	deliveryHandler "service-courier/internal/handler/delivery"
 	courierRepo "service-courier/internal/repository/courier"
+	deliveryRepo "service-courier/internal/repository/delivery"
 	courierService "service-courier/internal/service/courier"
+	deliveryService "service-courier/internal/service/delivery"
 
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,13 +37,44 @@ func main() {
 	}
 
 	dbPool := mustInitDB()
+
 	courierRepository := courierRepo.NewCourierRepository(dbPool)
-	courierService := courierService.NewCourierService(courierRepository)
-	courier := courierHandler.NewCourierHandler(courierService)
+	courierSvc := courierService.NewCourierService(courierRepository)
+	courier := courierHandler.NewCourierHandler(courierSvc)
+
+	ctxGetter := trmpgx.DefaultCtxGetter
+	deliveryRepository := deliveryRepo.NewDeliveryRepository(dbPool, ctxGetter)
+	deliveryTransportFactory := deliveryService.NewTransportFactory()
+
+	txManager := manager.Must(trmpgx.NewDefaultFactory(dbPool))
+
+	clock := deliveryService.RealClock{}
+
+	deliverySvc := deliveryService.NewDeliveryService(
+		deliveryRepository,
+		courierRepository,
+		deliveryTransportFactory,
+		txManager,
+		clock,
+	)
+	delivery := deliveryHandler.NewDeliveryHandler(deliverySvc)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	releaseInterval := resolveReleaseInterval()
+	worker := deliveryService.NewWorker(deliverySvc, releaseInterval)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		worker.Start(ctx)
+	}()
 
 	srv := &http.Server{
 		Addr:    ":" + resolvePort(),
-		Handler: initRouter(courier),
+		Handler: initRouter(courier, delivery),
 	}
 
 	serverErr := make(chan error, 1)
@@ -48,7 +86,7 @@ func main() {
 		}
 	}()
 
-	waitGracefulShutdown(srv, dbPool, serverErr)
+	waitGracefulShutdown(cancel, srv, dbPool, serverErr, &wg)
 
 	log.Println("Shutting down service-courier")
 }
@@ -70,7 +108,13 @@ func resolvePort() string {
 	return port
 }
 
-func waitGracefulShutdown(srv *http.Server, dbPool *pgxpool.Pool, serverErr <-chan error) {
+func waitGracefulShutdown(
+	cancel context.CancelFunc,
+	srv *http.Server,
+	dbPool *pgxpool.Pool,
+	serverErr <-chan error,
+	wg *sync.WaitGroup,
+) {
 	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -81,13 +125,29 @@ func waitGracefulShutdown(srv *http.Server, dbPool *pgxpool.Pool, serverErr <-ch
 		log.Println("Shutdown initiated by signal")
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Server shutdown failed: %v\n", err)
 	} else {
-		log.Println("HTTP server stoped")
+		log.Println("HTTP server stopped")
+	}
+
+	log.Println("Waiting for worker to stop...")
+	workerDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(workerDone)
+	}()
+
+	select {
+	case <-workerDone:
+		log.Println("Worker stopped")
+	case <-time.After(5 * time.Second):
+		log.Println("Worker shutdown timeout - proceeding anyway")
 	}
 
 	log.Println("Closing DB pool...")
@@ -95,7 +155,7 @@ func waitGracefulShutdown(srv *http.Server, dbPool *pgxpool.Pool, serverErr <-ch
 	log.Println("DB pool closed")
 }
 
-func initRouter(courier *courierHandler.Handler) *chi.Mux {
+func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
@@ -108,6 +168,11 @@ func initRouter(courier *courierHandler.Handler) *chi.Mux {
 		r.Get("/{id}", courier.Get)
 		r.Post("/", courier.Create)
 		r.Put("/", courier.Update)
+	})
+
+	r.Route("/delivery", func(r chi.Router) {
+		r.Post("/assign", delivery.Assign)
+		r.Post("/unassign", delivery.Unassign)
 	})
 
 	return r
@@ -161,10 +226,22 @@ func pingDatabaseWithRetry(ctx context.Context, dbPool *pgxpool.Pool, maxRetries
 			return nil
 		}
 
-		if i < maxRetries {
+		if i < maxRetries-1 {
 			log.Printf("db ping attempt %d failed: %v", i+1, err)
 			time.Sleep(retryDelay)
 		}
 	}
 	return fmt.Errorf("failed to ping database after %d attempts", maxRetries)
+}
+
+func resolveReleaseInterval() time.Duration {
+	env := os.Getenv("RELEASE_INTERVAL_SECONDS")
+	if env == "" {
+		return 10 * time.Second
+	}
+	sec, err := strconv.Atoi(env)
+	if err != nil || sec <= 0 {
+		return 10 * time.Second
+	}
+	return time.Duration(sec) * time.Second
 }

@@ -1,0 +1,30 @@
+//go:generate mockgen -destination=./mocks/delivery_repository_mock.go -package=mocks service-courier/internal/service/delivery deliveryRepository
+//go:generate mockgen -destination=./mocks/courier_repository_mock.go -package=mocks service-courier/internal/service/delivery courierRepository
+//go:generate mockgen -destination=./mocks/transaction_manager_mock.go -package=mocks service-courier/internal/service/delivery transactionManager
+package delivery
+
+import (
+	"context"
+	"service-courier/internal/model/courier"
+	"service-courier/internal/model/delivery"
+	"time"
+)
+
+type deliveryRepository interface {
+	Create(ctx context.Context, deliveryData delivery.Delivery) error
+	GetByOrderID(ctx context.Context, orderID string) (*delivery.Delivery, error)
+	DeleteByOrderID(ctx context.Context, orderID string) error
+	ListActiveExpired(ctx context.Context, now time.Time) ([]delivery.Delivery, error)
+	UpdateStatusByIDs(ctx context.Context, ids []int64, status delivery.DeliveryStatus) error
+}
+
+type courierRepository interface {
+	GetByID(ctx context.Context, id int64) (*courier.Courier, error)
+	GetAvailableWithMinDeliveries(ctx context.Context) (*courier.Courier, error)
+	Update(ctx context.Context, courierData courier.Courier) error
+	UpdateStatusBatch(ctx context.Context, ids []int64, status courier.CourierStatus) error
+}
+
+type transactionManager interface {
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
+}

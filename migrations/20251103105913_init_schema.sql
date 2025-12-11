@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS couriers (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL,
     phone       TEXT NOT NULL UNIQUE,
-    status      TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'available',
     created_at  TIMESTAMP DEFAULT now(),
     updated_at  TIMESTAMP DEFAULT now()
 );

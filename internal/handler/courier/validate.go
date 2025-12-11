@@ -16,6 +16,9 @@ func (r CreateRequest) Validate() error {
 	if err := validateStatus(r.Status); err != nil {
 		return err
 	}
+	if err := validateTransportType(r.TransportType); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -24,8 +27,8 @@ func (r UpdateRequest) Validate() error {
 		return fmt.Errorf("Invalid id")
 	}
 
-	if r.Name == "" && r.Phone == "" && r.Status == "" {
-		return fmt.Errorf("Must provide either Name or Phone, or Status")
+	if r.Name == "" && r.Phone == "" && r.Status == "" && r.TransportType == "" {
+		return fmt.Errorf("All fields are empty")
 	}
 
 	if r.Name != "" {
@@ -40,6 +43,11 @@ func (r UpdateRequest) Validate() error {
 	}
 	if r.Status != "" {
 		if err := validateStatus(r.Status); err != nil {
+			return err
+		}
+	}
+	if r.TransportType != "" {
+		if err := validateTransportType(r.TransportType); err != nil {
 			return err
 		}
 	}
@@ -79,5 +87,14 @@ func validateStatus(status string) error {
 		return nil
 	default:
 		return fmt.Errorf("Invalid status")
+	}
+}
+
+func validateTransportType(transportType string) error {
+	switch transportType {
+	case courier.TransportOnFoot, courier.TransportScooter, courier.TransportCar:
+		return nil
+	default:
+		return fmt.Errorf("Invalid transport type")
 	}
 }
