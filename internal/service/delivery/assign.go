@@ -12,12 +12,13 @@ func (s *Service) AssignCourier(ctx context.Context, orderID string) (*AssignRes
 	var result *AssignResult
 
 	err := s.txManager.Do(ctx, func(ctx context.Context) error {
-		_, err := s.deliveryRepo.GetByOrderID(ctx, orderID)
-		if err == nil {
-			return delivery.ErrOrderAlreadyAssigned
-		}
-		if !errors.Is(err, delivery.ErrDeliveryNotFound) {
+		existingDelivery, err := s.deliveryRepo.GetByOrderID(ctx, orderID)
+		if err != nil && !errors.Is(err, delivery.ErrDeliveryNotFound) {
 			return fmt.Errorf("check existing delivery: %w", err)
+		}
+
+		if existingDelivery != nil {
+			return delivery.ErrOrderAlreadyAssigned
 		}
 
 		availableCourier, err := s.courierRepo.GetAvailableWithMinDeliveries(ctx)
@@ -31,9 +32,6 @@ func (s *Service) AssignCourier(ctx context.Context, orderID string) (*AssignRes
 		assignedAt := s.clock.Now()
 
 		transport := s.transportFactory.Create(availableCourier.TransportType)
-		if transport == nil {
-			return fmt.Errorf("unknown transport type: %v", availableCourier.TransportType)
-		}
 
 		deadline := assignedAt.Add(transport.DeliveryDuration())
 
