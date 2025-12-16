@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	orderGateway "service-courier/internal/gateway/order"
 	"service-courier/internal/handler/common"
 	courierHandler "service-courier/internal/handler/courier"
 	deliveryHandler "service-courier/internal/handler/delivery"
@@ -59,6 +60,15 @@ func main() {
 	)
 	delivery := deliveryHandler.NewDeliveryHandler(deliverySvc)
 
+	orderCfg := orderGateway.LoadConfig()
+	orderClient, err := orderGateway.NewClient(orderCfg)
+	if err != nil {
+		log.Fatalf("Failed to init order gateway: %v", err)
+	}
+	defer orderClient.Close()
+
+	orderWorker := deliveryService.NewOrderWorker(deliverySvc, orderClient.Gateway, clock)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -70,6 +80,11 @@ func main() {
 	go func() {
 		defer wg.Done()
 		worker.Start(ctx)
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		orderWorker.Start(ctx)
 	}()
 
 	srv := &http.Server{
@@ -136,7 +151,7 @@ func waitGracefulShutdown(
 		log.Println("HTTP server stopped")
 	}
 
-	log.Println("Waiting for worker to stop...")
+	log.Println("Waiting for workers to stop...")
 	workerDone := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -145,9 +160,9 @@ func waitGracefulShutdown(
 
 	select {
 	case <-workerDone:
-		log.Println("Worker stopped")
+		log.Println("Workers stopped")
 	case <-time.After(5 * time.Second):
-		log.Println("Worker shutdown timeout - proceeding anyway")
+		log.Println("Workers shutdown timeout - proceeding anyway")
 	}
 
 	log.Println("Closing DB pool...")
