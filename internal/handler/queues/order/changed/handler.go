@@ -9,6 +9,12 @@ import (
 	"github.com/IBM/sarama"
 )
 
+var allowedStatuses = map[string]struct{}{
+	order.StatusCreated:   {},
+	order.StatusCancelled: {},
+	order.StatusCompleted: {},
+}
+
 type Handler struct {
 	usecase usecase
 }
@@ -40,8 +46,11 @@ func (h *Handler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.Co
 			continue
 		}
 
-		// мы можем отфильтровать сообщения ненужные сразу в хендлере,
-		// чтобы не передавать их на слой ниже
+		if _, ok := allowedStatuses[msg.Status]; !ok {
+			log.Printf("order.changed handler: skip message with status=%s", msg.Status)
+			sess.MarkMessage(dtoMsg, "")
+			continue
+		}
 
 		err = h.usecase.Process(ctx, order.Order{
 			ID:     msg.OrderID,
