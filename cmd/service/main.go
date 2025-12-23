@@ -16,6 +16,7 @@ import (
 	"service-courier/internal/handler/common"
 	courierHandler "service-courier/internal/handler/courier"
 	deliveryHandler "service-courier/internal/handler/delivery"
+	"service-courier/internal/metrics"
 	db "service-courier/internal/pkg/db"
 	courierRepo "service-courier/internal/repository/courier"
 	deliveryRepo "service-courier/internal/repository/delivery"
@@ -28,13 +29,14 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
 )
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %s", err.Error())
+		log.Printf("Error loading .env file: %s", err.Error())
 	}
 
 	dbPool := db.MustInitDB()
@@ -173,6 +175,7 @@ func waitGracefulShutdown(
 func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(metrics.Middleware)
 
 	r.Get("/ping", common.Ping)
 	r.Head("/healthcheck", common.HealthCheck)
@@ -189,6 +192,8 @@ func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handl
 		r.Post("/assign", delivery.Assign)
 		r.Post("/unassign", delivery.Unassign)
 	})
+
+	r.Handle("/metrics", promhttp.Handler())
 
 	return r
 }

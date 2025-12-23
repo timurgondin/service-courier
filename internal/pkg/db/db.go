@@ -31,7 +31,7 @@ func MustInitDB() *pgxpool.Pool {
 		log.Fatalf("Unable to create connection pool: %v\n", err)
 	}
 
-	err = pingDatabaseWithRetry(ctx, dbPool, 2, 2*time.Second)
+	err = pingDatabaseWithRetry(ctx, dbPool, 5, 2*time.Second)
 	if err != nil {
 		dbPool.Close()
 		log.Fatalf("Unable to ping database: %v\n", err)

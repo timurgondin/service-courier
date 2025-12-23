@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"service-courier/internal/metrics"
 	"service-courier/internal/model/courier"
 	modelDelivery "service-courier/internal/model/delivery"
 )
@@ -28,7 +29,7 @@ func (s *Service) CompleteDelivery(ctx context.Context, orderID string) error {
 			}
 			return fmt.Errorf("update courier status: %w", err)
 		}
-
+		metrics.OpsCounter.Inc()
 		return nil
 	})
 }

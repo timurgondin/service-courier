@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"service-courier/internal/metrics"
 	"service-courier/internal/model/courier"
 	"service-courier/internal/model/delivery"
 )
@@ -67,5 +68,6 @@ func (s *Service) AssignCourier(ctx context.Context, orderID string) (*AssignRes
 		return nil, fmt.Errorf("assign courier transaction: %w", err)
 	}
 
+	metrics.OpsCounter.Inc()
 	return result, nil
 }

@@ -24,7 +24,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %s", err.Error())
+		log.Printf("Error loading .env file: %s", err.Error())
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -41,8 +41,8 @@ func main() {
 	}
 
 	groupID := os.Getenv("KAFKA_GROUP_ID")
-	if topic == "" {
-		topic = "my-group-id"
+	if groupID == "" {
+		groupID = "my-group-id"
 	}
 
 	// Инициализируем клиента кафки

@@ -12,8 +12,12 @@ services:
       - pgdata:/var/lib/postgresql/data        # Хранилище данных
     ports:
       - "${POSTGRES_PORT}:5432"                # Проброс порта: хост:контейнер (хост берем из .env)
+    networks:
+      - infrastructure_default
   service-courier:
     build: .
+    env_file:
+      - .env
     ports:
       - "${COURIER_PORT}:${LOCALHOST}"
     environment:
@@ -21,10 +25,45 @@ services:
       - ORDER_SERVICE_HOST=${ORDER_SERVICE_HOST}
     networks:
       - infrastructure_default
+      - monitoring
+    depends_on:
+      - postgres
+
+  worker-courier:
+    build: .
+    entrypoint: ["/worker-courier"]
+    env_file:
+      - .env
+    networks:
+      - infrastructure_default
+      - monitoring
+    depends_on:
+      - postgres
+
+  grafana:
+    image: grafana/grafana
+    ports: ["3000:3000"]
+    volumes:
+      - "grafana-data:/var/lib/grafana"
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus
+    ports: ["9090:9090"]
+    volumes:
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "prometheus-data:/prometheus"
+    networks:
+      - monitoring
 
 volumes:
   pgdata:                         # Объявление Named Volume
+  grafana-data:
+  prometheus-data:
 
 networks:
   infrastructure_default:
     external: true
+  monitoring:
+    driver: bridge
