@@ -69,7 +69,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to init order gateway: %v", err)
 	}
-	defer orderClient.Close()
+	defer func() {
+		if err := orderClient.Close(); err != nil {
+			log.Printf("order client close error: %v", err)
+		}
+	}()
 
 	orderWorker := deliveryService.NewOrderWorker(deliverySvc, orderClient.Gateway, clock)
 

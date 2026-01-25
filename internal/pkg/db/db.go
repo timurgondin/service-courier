@@ -28,13 +28,13 @@ func MustInitDB() *pgxpool.Pool {
 
 	dbPool, err = pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		log.Fatalf("Unable to create connection pool: %v\n", err)
+		log.Panicf("Unable to create connection pool: %v\n", err)
 	}
 
 	err = pingDatabaseWithRetry(ctx, dbPool, 5, 2*time.Second)
 	if err != nil {
 		dbPool.Close()
-		log.Fatalf("Unable to ping database: %v\n", err)
+		log.Panicf("Unable to ping database: %v\n", err)
 	}
 
 	log.Println("Database connection pool established")

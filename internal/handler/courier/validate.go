@@ -24,11 +24,11 @@ func (r CreateRequest) Validate() error {
 
 func (r UpdateRequest) Validate() error {
 	if r.ID <= 0 {
-		return fmt.Errorf("Invalid id")
+		return fmt.Errorf("invalid id")
 	}
 
 	if r.Name == "" && r.Phone == "" && r.Status == "" && r.TransportType == "" {
-		return fmt.Errorf("All fields are empty")
+		return fmt.Errorf("all fields are empty")
 	}
 
 	if r.Name != "" {
@@ -57,24 +57,24 @@ func (r UpdateRequest) Validate() error {
 
 func validateName(name string) error {
 	if name == "" || len(name) > 100 {
-		return fmt.Errorf("Name is too long or empty")
+		return fmt.Errorf("name is too long or empty")
 	}
 	return nil
 }
 
 func validatePhone(phone string) error {
 	if phone == "" {
-		return fmt.Errorf("Phone is empty")
+		return fmt.Errorf("phone is empty")
 	}
 
 	if len(phone) != 12 || phone[0] != '+' {
-		return fmt.Errorf("Invalid phone")
+		return fmt.Errorf("invalid phone")
 	}
 
 	digits := phone[1:]
 	for _, digit := range digits {
 		if !unicode.IsDigit(digit) {
-			return fmt.Errorf("Invalid phone")
+			return fmt.Errorf("invalid phone")
 		}
 	}
 
@@ -86,7 +86,7 @@ func validateStatus(status string) error {
 	case courier.StatusAvailable, courier.StatusBusy, courier.StatusPaused:
 		return nil
 	default:
-		return fmt.Errorf("Invalid status")
+		return fmt.Errorf("invalid status")
 	}
 }
 
@@ -95,6 +95,6 @@ func validateTransportType(transportType string) error {
 	case courier.TransportOnFoot, courier.TransportScooter, courier.TransportCar:
 		return nil
 	default:
-		return fmt.Errorf("Invalid transport type")
+		return fmt.Errorf("invalid transport type")
 	}
 }

@@ -71,6 +71,7 @@ func TestAssignCourier_Success(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected result, got nil")
+		return
 	}
 	if result.OrderID != orderID {
 		t.Fatalf("expected OrderID=%s, got %s", orderID, result.OrderID)
@@ -408,6 +409,7 @@ func TestUnassignCourier_Success(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected result, got nil")
+		return
 	}
 	if result.OrderID != orderID {
 		t.Fatalf("expected OrderID=%s, got %s", orderID, result.OrderID)

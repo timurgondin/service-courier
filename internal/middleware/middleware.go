@@ -16,7 +16,9 @@ func RateLimitMiddleware(limiter *tb.TokenBucket) func(http.Handler) http.Handle
 				w.Header().Set("X-RateLimit-Limit", "10")
 				w.Header().Set("X-RateLimit-Remaining", "0")
 				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte("Rate limit exceeded"))
+				if _, err := w.Write([]byte("Rate limit exceeded")); err != nil {
+					log.Printf("failed to write rate limit response: %v", err)
+				}
 				return
 			}
 

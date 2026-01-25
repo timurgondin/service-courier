@@ -54,9 +54,15 @@ func main() {
 
 	kafkaClient, err := sarama.NewConsumerGroup([]string{broker}, groupID, config)
 	if err != nil {
-		log.Fatalf("unable to create kafka consumer group: %v", err)
+		log.Printf("unable to create kafka consumer group: %v", err)
+		cancel()
+		return
 	}
-	defer kafkaClient.Close()
+	defer func() {
+		if err := kafkaClient.Close(); err != nil {
+			log.Printf("kafka client close error: %v", err)
+		}
+	}()
 
 	dbPool := db.MustInitDB()
 
@@ -95,6 +101,7 @@ func main() {
 			select {
 			case <-ctx.Done():
 				return
+			default:
 			}
 		}
 	}()
@@ -115,6 +122,7 @@ func waitGracefulShutdown(cancel context.CancelFunc) {
 	select {
 	case sig := <-sigChan:
 		signal = sig.String()
+	default:
 	}
 
 	cancel()
