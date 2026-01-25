@@ -18,6 +18,16 @@ var (
 		Help: "Общее количество операций",
 	})
 
+	RateLimitExceededTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "rate_limit_exceeded_total",
+		Help: "Количество превышений rate limit",
+	})
+
+	GatewayRetriesTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "gateway_retries_total",
+		Help: "Количество ретраев в gateway",
+	})
+
 	HTTPRequestTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",

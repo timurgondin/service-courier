@@ -17,7 +17,9 @@ import (
 	courierHandler "service-courier/internal/handler/courier"
 	deliveryHandler "service-courier/internal/handler/delivery"
 	"service-courier/internal/metrics"
+	ratelimitMiddleware "service-courier/internal/middleware"
 	db "service-courier/internal/pkg/db"
+	"service-courier/internal/pkg/limiter"
 	courierRepo "service-courier/internal/repository/courier"
 	deliveryRepo "service-courier/internal/repository/delivery"
 	courierService "service-courier/internal/service/courier"
@@ -89,9 +91,11 @@ func main() {
 		orderWorker.Start(ctx)
 	}()
 
+	limit := limiter.NewTokenBucket(10, 5)
+
 	srv := &http.Server{
 		Addr:    ":" + resolvePort(),
-		Handler: initRouter(courier, delivery),
+		Handler: initRouter(courier, delivery, limit),
 	}
 
 	serverErr := make(chan error, 1)
@@ -172,9 +176,14 @@ func waitGracefulShutdown(
 	log.Println("DB pool closed")
 }
 
-func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handler) *chi.Mux {
+func initRouter(
+	courier *courierHandler.Handler,
+	delivery *deliveryHandler.Handler,
+	limit *limiter.TokenBucket,
+) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(ratelimitMiddleware.RateLimitMiddleware(limit))
 	r.Use(metrics.Middleware)
 
 	r.Get("/ping", common.Ping)
