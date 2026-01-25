@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,9 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	orderGateway "service-courier/internal/gateway/order"
 	"service-courier/internal/handler/common"
 	courierHandler "service-courier/internal/handler/courier"
 	deliveryHandler "service-courier/internal/handler/delivery"
+	"service-courier/internal/metrics"
+	db "service-courier/internal/pkg/db"
 	courierRepo "service-courier/internal/repository/courier"
 	deliveryRepo "service-courier/internal/repository/delivery"
 	courierService "service-courier/internal/service/courier"
@@ -27,16 +29,17 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
 )
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %s", err.Error())
+		log.Printf("Error loading .env file: %s", err.Error())
 	}
 
-	dbPool := mustInitDB()
+	dbPool := db.MustInitDB()
 
 	courierRepository := courierRepo.NewCourierRepository(dbPool)
 	courierSvc := courierService.NewCourierService(courierRepository)
@@ -59,6 +62,15 @@ func main() {
 	)
 	delivery := deliveryHandler.NewDeliveryHandler(deliverySvc)
 
+	orderCfg := orderGateway.LoadConfig()
+	orderClient, err := orderGateway.NewClient(orderCfg)
+	if err != nil {
+		log.Fatalf("Failed to init order gateway: %v", err)
+	}
+	defer orderClient.Close()
+
+	orderWorker := deliveryService.NewOrderWorker(deliverySvc, orderClient.Gateway, clock)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -70,6 +82,11 @@ func main() {
 	go func() {
 		defer wg.Done()
 		worker.Start(ctx)
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		orderWorker.Start(ctx)
 	}()
 
 	srv := &http.Server{
@@ -136,7 +153,7 @@ func waitGracefulShutdown(
 		log.Println("HTTP server stopped")
 	}
 
-	log.Println("Waiting for worker to stop...")
+	log.Println("Waiting for workers to stop...")
 	workerDone := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -145,9 +162,9 @@ func waitGracefulShutdown(
 
 	select {
 	case <-workerDone:
-		log.Println("Worker stopped")
+		log.Println("Workers stopped")
 	case <-time.After(5 * time.Second):
-		log.Println("Worker shutdown timeout - proceeding anyway")
+		log.Println("Workers shutdown timeout - proceeding anyway")
 	}
 
 	log.Println("Closing DB pool...")
@@ -158,6 +175,7 @@ func waitGracefulShutdown(
 func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(metrics.Middleware)
 
 	r.Get("/ping", common.Ping)
 	r.Head("/healthcheck", common.HealthCheck)
@@ -175,63 +193,9 @@ func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handl
 		r.Post("/unassign", delivery.Unassign)
 	})
 
+	r.Handle("/metrics", promhttp.Handler())
+
 	return r
-}
-
-func mustInitDB() *pgxpool.Pool {
-	var dbPool *pgxpool.Pool
-
-	config, err := pgxpool.ParseConfig(getConnectionString())
-	if err != nil {
-		log.Fatalf("Unable to parse connection string: %v\n", err)
-	}
-
-	config.MaxConns = 10
-	config.MinConns = 2
-	config.MaxConnLifetime = time.Hour
-	config.MaxConnIdleTime = time.Minute * 30
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	dbPool, err = pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		log.Fatalf("Unable to create connection pool: %v\n", err)
-	}
-
-	err = pingDatabaseWithRetry(ctx, dbPool, 2, 2*time.Second)
-	if err != nil {
-		dbPool.Close()
-		log.Fatalf("Unable to ping database: %v\n", err)
-	}
-
-	log.Println("Database connection pool established")
-	return dbPool
-}
-
-func getConnectionString() string {
-	host := os.Getenv("POSTGRES_HOST")
-	port := os.Getenv("POSTGRES_PORT")
-	user := os.Getenv("POSTGRES_USER")
-	password := os.Getenv("POSTGRES_PASSWORD")
-	dbname := os.Getenv("POSTGRES_DB")
-
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, password, host, port, dbname)
-}
-
-func pingDatabaseWithRetry(ctx context.Context, dbPool *pgxpool.Pool, maxRetries int, retryDelay time.Duration) error {
-	for i := range maxRetries {
-		err := dbPool.Ping(ctx)
-		if err == nil {
-			return nil
-		}
-
-		if i < maxRetries-1 {
-			log.Printf("db ping attempt %d failed: %v", i+1, err)
-			time.Sleep(retryDelay)
-		}
-	}
-	return fmt.Errorf("failed to ping database after %d attempts", maxRetries)
 }
 
 func resolveReleaseInterval() time.Duration {
