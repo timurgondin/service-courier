@@ -28,4 +28,4 @@ jobs:
     - name: Run tests with coverage
       run: |
         go test ./... -coverprofile=coverage.out -v
-        go tool cover -func=coverage.out | tee coverage.txt
+        go tool cover -func=coverage.out
