@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
@@ -111,6 +112,7 @@ func main() {
 		}
 	}()
 
+	startPprofServer(serverErr)
 	waitGracefulShutdown(cancel, srv, dbPool, serverErr, &wg)
 
 	log.Println("Shutting down service-courier")
@@ -221,4 +223,24 @@ func resolveReleaseInterval() time.Duration {
 		return 10 * time.Second
 	}
 	return time.Duration(sec) * time.Second
+}
+
+func startPprofServer(errChan chan error) *http.Server {
+	r := chi.NewRouter()
+
+	r.Mount("/debug", http.DefaultServeMux)
+
+	server := &http.Server{
+		Addr:    ":6060",
+		Handler: r,
+	}
+
+	go func() {
+		log.Println("pprof server started on 127.0.0.1:6060")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errChan <- err
+		}
+	}()
+
+	return server
 }

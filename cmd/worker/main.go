@@ -98,10 +98,8 @@ func main() {
 				log.Printf("consume error: %v", err)
 			}
 
-			select {
-			case <-ctx.Done():
+			if ctx.Err() != nil {
 				return
-			default:
 			}
 		}
 	}()
@@ -117,15 +115,10 @@ func main() {
 func waitGracefulShutdown(cancel context.CancelFunc) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
 
-	var signal string
-	select {
-	case sig := <-sigChan:
-		signal = sig.String()
-	default:
-	}
+	sig := <-sigChan
 
+	log.Printf("shutdown signal received: %s", sig)
 	cancel()
-
-	log.Printf("Shutdown signal (%s)", signal)
 }
