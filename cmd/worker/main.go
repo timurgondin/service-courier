@@ -22,6 +22,8 @@ import (
 )
 
 func main() {
+	unused := "variable for test linter"
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Error loading .env file: %s", err.Error())
