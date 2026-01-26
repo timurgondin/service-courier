@@ -43,7 +43,7 @@ func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 			pool.Close()
 		}
 		if i < 4 {
-			time.Sleep(time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}
 	if err != nil {
