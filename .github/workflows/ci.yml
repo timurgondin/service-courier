@@ -25,5 +25,7 @@ jobs:
     - name: Run golangci-lint
       run: golangci-lint run ./...
 
-    - name: Run tests
-      run: go test ./... -v
+    - name: Run tests with coverage
+      run: |
+        go test ./... -coverprofile=coverage.out -v
+        go tool cover -func=coverage.out | tee coverage.txt
