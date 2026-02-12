@@ -20,7 +20,7 @@ func NewClient(cfg Config) (*Client, error) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to gRPC server: %v", err)
+		return nil, fmt.Errorf("failed to connect to gRPC server: %v", err)
 	}
 
 	return &Client{

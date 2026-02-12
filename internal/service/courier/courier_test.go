@@ -41,6 +41,7 @@ func TestGetCourier_Success(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected result, got nil")
+		return
 	}
 	if result.ID != 1 {
 		t.Fatalf("expected ID=1, got %d", result.ID)

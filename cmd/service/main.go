@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
@@ -17,7 +18,9 @@ import (
 	courierHandler "service-courier/internal/handler/courier"
 	deliveryHandler "service-courier/internal/handler/delivery"
 	"service-courier/internal/metrics"
+	ratelimitMiddleware "service-courier/internal/middleware"
 	db "service-courier/internal/pkg/db"
+	"service-courier/internal/pkg/limiter"
 	courierRepo "service-courier/internal/repository/courier"
 	deliveryRepo "service-courier/internal/repository/delivery"
 	courierService "service-courier/internal/service/courier"
@@ -67,7 +70,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to init order gateway: %v", err)
 	}
-	defer orderClient.Close()
+	defer func() {
+		if err := orderClient.Close(); err != nil {
+			log.Printf("order client close error: %v", err)
+		}
+	}()
 
 	orderWorker := deliveryService.NewOrderWorker(deliverySvc, orderClient.Gateway, clock)
 
@@ -89,9 +96,11 @@ func main() {
 		orderWorker.Start(ctx)
 	}()
 
+	limit := limiter.NewTokenBucket(10, 5)
+
 	srv := &http.Server{
 		Addr:    ":" + resolvePort(),
-		Handler: initRouter(courier, delivery),
+		Handler: initRouter(courier, delivery, limit),
 	}
 
 	serverErr := make(chan error, 1)
@@ -103,6 +112,7 @@ func main() {
 		}
 	}()
 
+	startPprofServer(serverErr)
 	waitGracefulShutdown(cancel, srv, dbPool, serverErr, &wg)
 
 	log.Println("Shutting down service-courier")
@@ -172,9 +182,14 @@ func waitGracefulShutdown(
 	log.Println("DB pool closed")
 }
 
-func initRouter(courier *courierHandler.Handler, delivery *deliveryHandler.Handler) *chi.Mux {
+func initRouter(
+	courier *courierHandler.Handler,
+	delivery *deliveryHandler.Handler,
+	limit *limiter.TokenBucket,
+) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(ratelimitMiddleware.RateLimitMiddleware(limit))
 	r.Use(metrics.Middleware)
 
 	r.Get("/ping", common.Ping)
@@ -208,4 +223,24 @@ func resolveReleaseInterval() time.Duration {
 		return 10 * time.Second
 	}
 	return time.Duration(sec) * time.Second
+}
+
+func startPprofServer(errChan chan error) *http.Server {
+	r := chi.NewRouter()
+
+	r.Mount("/debug", http.DefaultServeMux)
+
+	server := &http.Server{
+		Addr:    ":6060",
+		Handler: r,
+	}
+
+	go func() {
+		log.Println("pprof server started on 127.0.0.1:6060")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errChan <- err
+		}
+	}()
+
+	return server
 }

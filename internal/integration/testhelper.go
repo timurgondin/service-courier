@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
@@ -16,8 +15,8 @@ func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:15"),
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:15",
 		postgres.WithDatabase("testdb"),
 		postgres.WithUsername("testuser"),
 		postgres.WithPassword("testpass"),
@@ -28,7 +27,9 @@ func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 
 	connStr, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		postgresContainer.Terminate(ctx)
+		if termErr := postgresContainer.Terminate(ctx); termErr != nil {
+			t.Logf("failed to terminate container: %v", termErr)
+		}
 		t.Fatalf("failed to get connection string: %v", err)
 	}
 
@@ -42,17 +43,21 @@ func SetupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 			pool.Close()
 		}
 		if i < 4 {
-			time.Sleep(time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}
 	if err != nil {
-		postgresContainer.Terminate(ctx)
+		if termErr := postgresContainer.Terminate(ctx); termErr != nil {
+			t.Logf("failed to terminate container: %v", termErr)
+		}
 		t.Fatalf("failed to create connection pool: %v", err)
 	}
 
 	if err := applyMigrations(ctx, pool); err != nil {
 		pool.Close()
-		postgresContainer.Terminate(ctx)
+		if termErr := postgresContainer.Terminate(ctx); termErr != nil {
+			t.Logf("failed to terminate container: %v", termErr)
+		}
 		t.Fatalf("failed to apply migrations: %v", err)
 	}
 
