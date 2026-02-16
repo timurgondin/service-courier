@@ -1,0 +1,78 @@
+version: "3.7"
+services:
+  zookeeper:
+    restart: always
+    container_name: kafka-like-zookeeper
+    image: docker.io/bitnamilegacy/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper-volume:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - infrastructure_default
+
+  kafka:
+    restart: always
+    container_name: kafka-like
+    image: docker.io/bitnamilegacy/kafka:3.3
+    ports:
+      - "9093:9093"
+    volumes:
+      - "kafka-volume:/bitnami"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+    healthcheck:
+      test: [ "CMD", "kafka-topics.sh", "--list", "--bootstrap-server", "localhost:9092" ]
+      interval: 5s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      - zookeeper
+    networks:
+      - infrastructure_default
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - infrastructure_default
+
+  topic-creator:
+    image: docker.io/bitnamilegacy/kafka:3.3
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        echo "Создаём топик test-topic..."
+        kafka-topics.sh --create --topic test-topic --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+        echo "Топик создан"
+    restart: no
+    networks:
+      - infrastructure_default
+
+
+volumes:
+  kafka-volume:
+  zookeeper-volume:
+
+networks:
+  infrastructure_default:
+    name: infrastructure_default
